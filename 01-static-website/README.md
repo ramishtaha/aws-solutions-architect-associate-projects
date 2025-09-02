@@ -54,6 +54,11 @@ Certificate Manager provides SSL/TLS certificate to CloudFront
    aws s3 mb s3://your-unique-bucket-name-static-website
    ```
    > Replace `your-unique-bucket-name-static-website` with a globally unique name
+   > 
+   > **Important**: Note which region your bucket is created in. You can check with:
+   > ```bash
+   > aws s3api get-bucket-location --bucket your-unique-bucket-name-static-website
+   > ```
 
 2. **Enable Static Website Hosting**
    ```bash
@@ -109,6 +114,15 @@ Certificate Manager provides SSL/TLS certificate to CloudFront
 1. **Create Distribution Configuration File**
    - Use the provided `assets/cloudfront-config.json` file
    - Replace placeholders with your S3 bucket name and certificate ARN
+   - **Critical**: Update the `DomainName` field to match your bucket's region:
+     ```
+     "DomainName": "your-bucket-name.s3-website-REGION.amazonaws.com"
+     ```
+     Replace `REGION` with your bucket's actual region (e.g., `us-east-1`, `eu-west-1`, `ap-southeast-1`)
+   - To find your bucket's region, run:
+     ```bash
+     aws s3api get-bucket-location --bucket your-unique-bucket-name-static-website
+     ```
 
 2. **Create CloudFront Distribution**
    ```bash
@@ -154,6 +168,42 @@ Certificate Manager provides SSL/TLS certificate to CloudFront
 
 3. **Test Global CDN Performance**
    - Use online tools like GTmetrix or Pingdom to test load times from different global locations
+
+### Troubleshooting Common Issues
+
+**Problem**: Getting "400 Bad Request - IncorrectEndpoint" error
+```
+The specified bucket exists in another region. Please direct requests to the specified endpoint.
+```
+
+**Solution**: Your CloudFront distribution is pointing to the wrong regional S3 endpoint.
+1. **Check your bucket's region**:
+   ```bash
+   aws s3api get-bucket-location --bucket your-bucket-name
+   ```
+2. **Update the CloudFront configuration** in `assets/cloudfront-config.json`:
+   - Change the `DomainName` from: `your-bucket.s3-website-us-east-1.amazonaws.com`
+   - To: `your-bucket.s3-website-YOUR-ACTUAL-REGION.amazonaws.com`
+3. **Update your existing distribution** or create a new one with the correct configuration
+
+**Problem**: CloudFront distribution deployment is taking too long
+**Solution**: CloudFront deployments typically take 15-20 minutes. This is normal and cannot be accelerated.
+
+**Problem**: Getting "IllegalUpdate" error when updating CloudFront distribution
+```
+OriginReadTimeout is required for updates
+```
+**Solution**: CloudFront CLI updates require the complete current configuration, not a template.
+1. **Use AWS Console instead** (easier):
+   - Go to CloudFront Console → Select your distribution → Origins tab → Edit origin
+   - Update the Origin Domain Name to the correct regional endpoint
+2. **Or use CLI properly**:
+   ```bash
+   # Get complete current config
+   aws cloudfront get-distribution-config --id YOUR_DISTRIBUTION_ID > current-config.json
+   # Edit the file to update only the DomainName field
+   # Use the ETag from the response in your update command
+   ```
 
 ## 7. Learning Materials & Key Concepts
 
