@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found - AWS Static Website</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .error-container {
+            text-align: center;
+            padding: 100px 20px;
+            min-height: 60vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .error-code {
+            font-size: 8rem;
+            font-weight: bold;
+            color: #ff6b35;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        .error-message {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .back-home {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #ff9500;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+            font-weight: bold;
+        }
+        .back-home:hover {
+            background-color: #e6851e;
+        }
+        .aws-info {
+            margin-top: 50px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-container">
+                <h1 class="nav-title">AWS Static Website</h1>
+                <ul class="nav-menu">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/#about">About</a></li>
+                    <li><a href="/#services">Services</a></li>
+                    <li><a href="/#contact">Contact</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <div class="error-container">
+            <div class="error-code">404</div>
+            <h1 class="error-message">Oops! Page Not Found</h1>
+            <p>The page you're looking for doesn't exist on this AWS-hosted static website.</p>
+            <a href="/" class="back-home">← Back to Home</a>
+            
+            <div class="aws-info">
+                <h3>🔧 Technical Information</h3>
+                <p><strong>Error served by:</strong> Amazon CloudFront</p>
+                <p><strong>Origin:</strong> Amazon S3 Static Website</p>
+                <p><strong>Custom Error Page:</strong> Configured in S3 bucket settings</p>
+                <p><strong>SAA-C03 Learning:</strong> This demonstrates proper error handling in static website hosting with custom error pages served from S3.</p>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 AWS Static Website Project. Part of the 10 Hands-On Projects for AWS Solutions Architect Associate (SAA-C03) Preparation.</p>
+            <p>Error page successfully served via: Amazon S3 + CloudFront + Route 53</p>
+        </div>
+    </footer>
+
+    <script>
+        // Log 404 error for debugging
+        console.log('404 Error: Page not found');
+        console.log('Custom error page served by AWS S3 Static Website Hosting');
+        console.log('Distributed globally via Amazon CloudFront');
+        
+        // Add timestamp to footer
+        document.addEventListener('DOMContentLoaded', function() {
+            const loadTime = new Date().toISOString();
+            const footer = document.querySelector('footer .container');
+            const timeElement = document.createElement('p');
+            timeElement.innerHTML = `<small>Error page loaded at: ${loadTime} | Served by AWS CloudFront</small>`;
+            timeElement.style.fontSize = '0.8em';
+            timeElement.style.color = '#666';
+            footer.appendChild(timeElement);
+        });
+    </script>
+</body>
+</html>

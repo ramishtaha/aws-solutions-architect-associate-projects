@@ -1,0 +1,83 @@
+{
+    "CallerReference": "static-website-distribution-2024",
+    "Aliases": {
+        "Quantity": 1,
+        "Items": ["yourdomain.com"]
+    },
+    "DefaultRootObject": "index.html",
+    "Comment": "Static website distribution for SAA-C03 Project 01",
+    "Enabled": true,
+    "Origins": {
+        "Quantity": 1,
+        "Items": [
+            {
+                "Id": "S3-your-unique-bucket-name-static-website",
+                "DomainName": "your-unique-bucket-name-static-website.s3-website-us-east-1.amazonaws.com",
+                "CustomOriginConfig": {
+                    "HTTPPort": 80,
+                    "HTTPSPort": 443,
+                    "OriginProtocolPolicy": "http-only",
+                    "OriginSslProtocols": {
+                        "Quantity": 1,
+                        "Items": ["TLSv1.2"]
+                    }
+                }
+            }
+        ]
+    },
+    "DefaultCacheBehavior": {
+        "TargetOriginId": "S3-your-unique-bucket-name-static-website",
+        "ViewerProtocolPolicy": "redirect-to-https",
+        "TrustedSigners": {
+            "Enabled": false,
+            "Quantity": 0,
+            "Items": []
+        },
+        "ForwardedValues": {
+            "QueryString": false,
+            "Cookies": {
+                "Forward": "none"
+            },
+            "Headers": {
+                "Quantity": 0,
+                "Items": []
+            }
+        },
+        "MinTTL": 0,
+        "DefaultTTL": 86400,
+        "MaxTTL": 31536000,
+        "Compress": true
+    },
+    "CustomErrorResponses": {
+        "Quantity": 2,
+        "Items": [
+            {
+                "ErrorCode": 404,
+                "ResponsePagePath": "/error.html",
+                "ResponseCode": "404",
+                "ErrorCachingMinTTL": 300
+            },
+            {
+                "ErrorCode": 403,
+                "ResponsePagePath": "/error.html",
+                "ResponseCode": "404",
+                "ErrorCachingMinTTL": 300
+            }
+        ]
+    },
+    "Logging": {
+        "Enabled": false,
+        "IncludeCookies": false,
+        "Bucket": "",
+        "Prefix": ""
+    },
+    "PriceClass": "PriceClass_100",
+    "ViewerCertificate": {
+        "ACMCertificateArn": "arn:aws:acm:us-east-1:ACCOUNT-ID:certificate/CERTIFICATE-ID",
+        "SSLSupportMethod": "sni-only",
+        "MinimumProtocolVersion": "TLSv1.2_2021"
+    },
+    "WebACLId": "",
+    "HttpVersion": "http2",
+    "IsIPV6Enabled": true
+}

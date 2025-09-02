@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Static Website - Project 01</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-container">
+                <h1 class="nav-title">AWS Static Website</h1>
+                <ul class="nav-menu">
+                    <li><a href="#home">Home</a></li>
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#services">Services</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <section id="home" class="hero">
+            <div class="hero-content">
+                <h2>Welcome to Your AWS Static Website!</h2>
+                <p>This website is hosted on Amazon S3, distributed globally via CloudFront, and secured with SSL/TLS certificates from AWS Certificate Manager.</p>
+                <div class="aws-badges">
+                    <span class="badge">Amazon S3</span>
+                    <span class="badge">CloudFront CDN</span>
+                    <span class="badge">Route 53 DNS</span>
+                    <span class="badge">Certificate Manager</span>
+                </div>
+            </div>
+        </section>
+
+        <section id="about" class="section">
+            <div class="container">
+                <h2>About This Project</h2>
+                <p>This static website demonstrates a modern, scalable, and cost-effective web hosting architecture using AWS services. The architecture includes:</p>
+                <div class="features-grid">
+                    <div class="feature">
+                        <h3>🚀 High Performance</h3>
+                        <p>CloudFront CDN ensures fast loading times for users worldwide by caching content at edge locations.</p>
+                    </div>
+                    <div class="feature">
+                        <h3>🔒 Secure by Default</h3>
+                        <p>SSL/TLS encryption is automatically provisioned and managed by AWS Certificate Manager.</p>
+                    </div>
+                    <div class="feature">
+                        <h3>💰 Cost-Effective</h3>
+                        <p>Pay only for what you use with S3 storage and CloudFront data transfer pricing.</p>
+                    </div>
+                    <div class="feature">
+                        <h3>📈 Highly Scalable</h3>
+                        <p>Automatically handles traffic spikes without server management or capacity planning.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="services" class="section gray-bg">
+            <div class="container">
+                <h2>AWS Services in Action</h2>
+                <div class="services-list">
+                    <div class="service">
+                        <h4>Amazon S3 - Static Website Hosting</h4>
+                        <p>Stores and serves your static website files with 99.999999999% durability and 99.99% availability SLA.</p>
+                    </div>
+                    <div class="service">
+                        <h4>Amazon CloudFront - Global Content Delivery</h4>
+                        <p>Distributes content from 400+ edge locations worldwide, reducing latency and improving user experience.</p>
+                    </div>
+                    <div class="service">
+                        <h4>Amazon Route 53 - DNS Management</h4>
+                        <p>Provides reliable and scalable Domain Name System (DNS) web service with health checks and failover.</p>
+                    </div>
+                    <div class="service">
+                        <h4>AWS Certificate Manager - SSL/TLS Security</h4>
+                        <p>Automatically provisions, manages, and deploys SSL/TLS certificates with no additional cost.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="contact" class="section">
+            <div class="container">
+                <h2>Architecture Benefits</h2>
+                <p>This serverless static website architecture provides:</p>
+                <ul class="benefits-list">
+                    <li>✅ No server management required</li>
+                    <li>✅ Automatic scaling for traffic spikes</li>
+                    <li>✅ Global content distribution</li>
+                    <li>✅ Built-in security and DDoS protection</li>
+                    <li>✅ Cost optimization through pay-per-use pricing</li>
+                    <li>✅ High availability across multiple AWS regions</li>
+                </ul>
+                <p class="exam-note"><strong>SAA-C03 Exam Tip:</strong> This architecture pattern is frequently tested as a cost-effective alternative to EC2-based web hosting for static content scenarios.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 AWS Static Website Project. Part of the 10 Hands-On Projects for AWS Solutions Architect Associate (SAA-C03) Preparation.</p>
+            <p>Successfully hosted on: Amazon S3 + CloudFront + Route 53 + Certificate Manager</p>
+        </div>
+    </footer>
+
+    <script>
+        // Simple JavaScript to show the page loaded successfully
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('AWS Static Website loaded successfully!');
+            console.log('Architecture: S3 + CloudFront + Route 53 + Certificate Manager');
+            
+            // Add loading timestamp
+            const loadTime = new Date().toISOString();
+            const footer = document.querySelector('footer .container');
+            const timeElement = document.createElement('p');
+            timeElement.innerHTML = `<small>Page loaded at: ${loadTime} | Served by AWS CloudFront</small>`;
+            timeElement.style.fontSize = '0.8em';
+            timeElement.style.color = '#666';
+            footer.appendChild(timeElement);
+        });
+
+        // Simple smooth scrolling for navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
