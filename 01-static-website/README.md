@@ -67,10 +67,29 @@ Certificate Manager provides SSL/TLS certificate to CloudFront
    aws s3 cp assets/styles.css s3://your-unique-bucket-name-static-website/
    ```
 
-4. **Configure Bucket Policy for Public Read Access**
+4. **Disable Block Public Access Settings** (Required for static website hosting)
+   
+   ⚠️ **Important**: By default, S3 blocks all public access for security. For static website hosting, we need to allow public read access to serve web pages.
+   
+   ```bash
+   aws s3api put-public-access-block --bucket your-unique-bucket-name-static-website --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+   ```
+   
+   **What this command does:**
+   - `BlockPublicAcls=false`: Allows public ACLs
+   - `IgnorePublicAcls=false`: Doesn't ignore public ACLs
+   - `BlockPublicPolicy=false`: **This is the key setting** - allows public bucket policies
+   - `RestrictPublicBuckets=false`: Allows public bucket policies to grant public access
+
+5. **Configure Bucket Policy for Public Read Access**
+   
+   > **Note**: Update the `bucket-policy.json` file to replace `your-unique-bucket-name-static-website` with your actual bucket name before running this command.
+   
    ```bash
    aws s3api put-bucket-policy --bucket your-unique-bucket-name-static-website --policy file://assets/bucket-policy.json
    ```
+   
+   **If you get an "AccessDenied" error**, it means the Block Public Access settings are still enabled. Make sure you completed Step 4 above.
 
 ### Step 2: Request SSL/TLS Certificate from AWS Certificate Manager
 
@@ -146,7 +165,7 @@ Certificate Manager provides SSL/TLS certificate to CloudFront
 
 - **Route 53 Alias Records:** Alias records are AWS-specific DNS records that provide performance benefits and cost savings compared to CNAME records. They can route traffic directly to AWS resources like CloudFront distributions without additional DNS lookups.
 
-- **Security Best Practices:** The bucket policy implements least privilege access (public read-only for website content). CloudFront Origin Access Identity (OAI) can be used to restrict direct S3 access, forcing all traffic through CloudFront for better security and performance.
+- **Security Best Practices:** The bucket policy implements least privilege access (public read-only for website content). **S3 Block Public Access** is a critical security feature that prevents accidental data exposure - we specifically disable it for static website hosting, but you should understand when and why to use it. CloudFront Origin Access Identity (OAI) can be used to restrict direct S3 access, forcing all traffic through CloudFront for better security and performance.
 
 - **High Availability and Scalability:** This architecture is inherently highly available across multiple AWS Availability Zones and Regions. S3 provides 99.99% availability SLA, and CloudFront has a global presence, making it suitable for mission-critical static websites.
 
@@ -196,6 +215,11 @@ Certificate Manager provides SSL/TLS certificate to CloudFront
    aws s3 rm s3://your-unique-bucket-name-static-website --recursive
    aws s3 rb s3://your-unique-bucket-name-static-website
    ```
+   
+   > **Security Note**: When you delete the bucket, the Block Public Access settings are removed automatically. If you were keeping the bucket for other purposes, you should re-enable Block Public Access:
+   > ```bash
+   > aws s3api put-public-access-block --bucket your-bucket-name --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+   > ```
 
 5. **Delete Route 53 Hosted Zone** (optional, if you own the domain)
    ```bash
