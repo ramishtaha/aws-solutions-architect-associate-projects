@@ -38,11 +38,12 @@ Certificate Manager provides SSL/TLS certificate to CloudFront
 ```
 
 ## 5. Prerequisites
-- An AWS Account with appropriate permissions
-- AWS CLI installed and configured with your credentials
+
+**Before starting this project, ensure you have completed the [Prerequisites Guide](../PREREQUISITES.md).**
+
+**Project-specific requirements:**
 - A domain name (you can use a free domain from services like Freenom, or purchase one from Route 53)
-- Basic knowledge of HTML/CSS (sample files provided)
-- Text editor or IDE
+- Basic knowledge of HTML/CSS (sample files provided in this project)
 
 ## 6. Step-by-Step Guide
 

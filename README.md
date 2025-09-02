@@ -40,10 +40,15 @@ Each project is designed to be:
 
 ## Prerequisites
 
-- **AWS Account**: Sign up for an AWS Free Tier account
-- **AWS CLI**: Install and configure the AWS Command Line Interface
-- **Basic IT knowledge**: Understanding of networking, security, and web applications is helpful
-- **Text editor**: Any code editor (VS Code, Sublime Text, etc.)
+**🚀 Before starting any projects, please complete the one-time setup by following our [Prerequisites Guide](./PREREQUISITES.md).**
+
+The prerequisites guide covers:
+- AWS Account creation and security setup (IAM user creation)
+- AWS CLI installation and configuration  
+- Recommended tools installation (VS Code, Git)
+- Cost management and billing alerts setup
+
+This setup takes about 30-45 minutes but is essential for all projects in this repository.
 
 ## Cost Considerations
 
