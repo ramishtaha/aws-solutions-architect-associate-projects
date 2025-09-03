@@ -43,9 +43,22 @@ API Gateway handles:                Lambda Function handles:       DynamoDB prov
 **Project-specific requirements:**
 - Basic understanding of HTTP methods (GET, POST, PUT, DELETE)
 - Familiarity with JSON data format
+- Python 3.x installed (for reliable Lambda testing)
+- boto3 AWS SDK for Python: `pip3 install boto3` (WSL2/Linux) or `pip install boto3` (Windows)
 - Basic knowledge of REST API concepts (optional, but helpful)
 
+**Setup**: Clone this repository and navigate to this project directory:
+```bash
+# Clone the repository (if you haven't already)
+git clone <repository-url>
+
+# Navigate to this project
+cd aws-solutions-architect-associate-projects/02-serverless-api
+```
+
 ## 6. Step-by-Step Guide
+
+**Important**: All commands in this guide assume you are in the project root directory (`02-serverless-api`). Adjust paths accordingly if you are in a different location.
 
 ### Step 1: Create DynamoDB Table for Task Storage
 
@@ -146,16 +159,43 @@ API Gateway handles:                Lambda Function handles:       DynamoDB prov
    > Replace YOUR_ACCOUNT_ID with your actual AWS account ID
 
 3. **Test Lambda Function**
-   ```bash
-   aws lambda invoke \
-       --function-name TaskAPI \
-       --payload '{"httpMethod": "GET", "pathParameters": null, "queryStringParameters": null, "body": null}' \
-       --region your-region \
-       response.json
    
-   # View the response
-   type response.json
+   Due to encoding issues with AWS CLI across different platforms (especially WSL2), we recommend using the Python script for reliable testing.
+   
+   **Method 1: Python Script Testing (Recommended)**
+   
+   ```bash
+   # Navigate to the assets directory
+   cd assets
+   
+   # For WSL2/Linux
+   python3 test_lambda.py
+   
+   # For Windows PowerShell/CMD
+   python test_lambda.py
    ```
+   
+   This script will:
+   - Test multiple scenarios (GET all tasks, GET with filters, POST create task)
+   - Provide clear success/failure indicators
+   - Display formatted responses
+   - Give troubleshooting tips if tests fail
+   
+   **Method 2: AWS CLI (Alternative, if no encoding issues)**
+   
+   **For WSL2/Linux:**
+   ```bash
+   aws lambda invoke --function-name TaskAPI --payload fileb://test-payload.json --region your-region response.json
+   cat response.json
+   ```
+   
+   **For Windows PowerShell:**
+   ```powershell
+   aws lambda invoke --function-name TaskAPI --payload file://test-payload.json --region your-region response.json
+   Get-Content response.json
+   ```
+   
+   **Note:** If you encounter encoding errors with AWS CLI, use the Python script instead.
 
 ### Step 4: Create API Gateway REST API
 
@@ -333,6 +373,59 @@ API Gateway handles:                Lambda Function handles:       DynamoDB prov
    curl -X DELETE https://YOUR_API_ID.execute-api.your-region.amazonaws.com/prod/tasks/TASK_ID_HERE
    ```
 
+### Troubleshooting Common Issues
+
+**Problem**: AWS CLI encoding errors (WSL2/Linux/Windows)
+```
+InvalidRequestContentException: Could not parse payload into json
+```
+OR
+```
+Invalid base64: "..."
+```
+OR
+```
+Unexpected character ((CTRL-CHAR, code 134))
+```
+
+**Solution**: Use the Python script instead of AWS CLI:
+```bash
+# WSL2/Linux
+python3 test_lambda.py
+
+# Windows
+python test_lambda.py
+```
+
+**Problem**: "ModuleNotFoundError: No module named 'boto3'"
+**Solution**: Install the AWS SDK for Python:
+```bash
+# WSL2/Linux
+pip3 install boto3
+
+# Windows
+pip install boto3
+```
+
+**Problem**: Lambda function timeout or error in Python script
+**Solution**: Check CloudWatch logs:
+```bash
+aws logs describe-log-groups --log-group-name-prefix "/aws/lambda/TaskAPI"
+```
+
+**Problem**: Python script shows "AWS SDK initialization failed"
+**Solution**: Configure AWS credentials:
+```bash
+aws configure
+```
+
+**Problem**: Lambda function timeout or error
+**Solution**: Check CloudWatch logs:
+```bash
+aws logs describe-log-groups --log-group-name-prefix "/aws/lambda/TaskAPI"
+aws logs get-log-events --log-group-name "/aws/lambda/TaskAPI" --log-stream-name "LATEST"
+```
+
 ## 7. Learning Materials & Key Concepts
 
 - **Serverless Architecture Benefits:** This project demonstrates the "No Server Management" principle - you focus purely on code and business logic. AWS handles scaling, patching, and infrastructure management. This is a key cost-optimization pattern in SAA-C03, especially for variable or unpredictable workloads.
@@ -399,8 +492,16 @@ API Gateway handles:                Lambda Function handles:       DynamoDB prov
 
 5. **Delete Local Files**
    ```bash
-   del assets\lambda-deployment.zip
-   del response.json
+   # Navigate to project root
+   cd ..
+   
+   # Remove deployment package and response files
+   rm assets/lambda-deployment.zip
+   rm response.json
+   
+   # On Windows, use:
+   # del assets\lambda-deployment.zip
+   # del response.json
    ```
 
 ## 10. Associated Project Files
@@ -409,7 +510,10 @@ The following files are provided in the `assets` folder:
 
 - `assets/lambda_function.py` - Complete Python code for the Lambda function handling all CRUD operations
 - `assets/iam_policy.json` - IAM policy granting Lambda function access to DynamoDB operations
-- `assets/test_requests.json` - Sample API requests for testing (curl commands and JSON payloads)
+- `assets/test_lambda.py` - Python script for reliable Lambda function testing (recommended)
+- `assets/test-payload.json` - Simple JSON payload for AWS CLI testing (if needed)
+- `assets/test-post-payload.json` - Sample POST request payload for AWS CLI testing
+- `assets/test_requests.md` - Sample API requests for testing (curl commands and JSON payloads)
 - `assets/api_documentation.md` - Complete API documentation with request/response examples
 
 ---
