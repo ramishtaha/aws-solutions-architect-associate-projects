@@ -2,6 +2,8 @@
 
 This file contains sample API requests for testing your serverless Task Management API.
 
+**Note**: Replace `YOUR_API_ID` and `your-region` with your actual values throughout this document.
+
 ## Base URL
 Replace `YOUR_API_ID` and `your-region` with your actual values:
 ```

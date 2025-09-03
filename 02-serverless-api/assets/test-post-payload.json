@@ -1,0 +1,14 @@
+{
+  "httpMethod": "POST",
+  "pathParameters": null,
+  "queryStringParameters": null,
+  "body": "{\"title\": \"Test Task from Lambda\", \"description\": \"Testing Lambda function directly\", \"status\": \"pending\", \"priority\": \"medium\"}",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "isBase64Encoded": false,
+  "requestContext": {
+    "httpMethod": "POST",
+    "path": "/tasks"
+  }
+}
