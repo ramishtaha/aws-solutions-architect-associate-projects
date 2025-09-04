@@ -112,22 +112,41 @@ Intermediate
 
 4. **Configure Route Tables**
    - In left navigation, click **Route tables**
-   - Note the default route table created with your VPC (rename it to `wordpress-private-rt`)
-   - Click **Create route table**
-   - Name: `wordpress-public-rt`
-   - VPC: Select `wordpress-vpc`
-   - Click **Create route table**
-   - **Configure Public Route Table**:
+   - You should see only the **main route table** that was automatically created with your VPC
+     - It will be named "Main" or have an ID like "rtb-xxxxxxxx"
+     - This is the only route table that exists initially
+   
+   - **Create Public Route Table**:
+     - Click **Create route table**
+     - Name: `wordpress-public-rt`
+     - VPC: Select `wordpress-vpc`
+     - Click **Create route table**
+   
+   - **Create Private Route Table**:
+     - Click **Create route table** again
+     - Name: `wordpress-private-rt`
+     - VPC: Select `wordpress-vpc`
+     - Click **Create route table**
+   
+   - **Configure Public Route Table** (for internet access):
      - Select `wordpress-public-rt`
      - Click **Routes** tab → **Edit routes**
-     - Click **Add route**: Destination `0.0.0.0/0`, Target: Internet Gateway `wordpress-igw`
+     - Click **Add route**: 
+       - Destination: `0.0.0.0/0`
+       - Target: Internet Gateway → select `wordpress-igw`
      - Click **Save changes**
      - Click **Subnet associations** tab → **Edit subnet associations**
-     - Select both public subnets and click **Save associations**
-   - **Configure Private Route Table**:
+     - Select both public subnets (`wordpress-public-1a` and `wordpress-public-1b`)
+     - Click **Save associations**
+   
+   - **Configure Private Route Table** (no internet access):
      - Select `wordpress-private-rt`
+     - **Routes tab**: Keep default (only local VPC route 10.0.0.0/16)
      - Click **Subnet associations** tab → **Edit subnet associations**
-     - Select both private subnets and click **Save associations**
+     - Select both private subnets (`wordpress-private-1a` and `wordpress-private-1b`)
+     - Click **Save associations**
+   
+   - **Note**: The main route table can be left unused or used as a backup
 
 ### Step 2: Database Layer Setup
 1. **Create DB Subnet Group**
