@@ -1,0 +1,110 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "SSMSessionManagerPermissions",
+            "Effect": "Allow",
+            "Action": [
+                "ssm:UpdateInstanceInformation",
+                "ssmmessages:CreateControlChannel",
+                "ssmmessages:CreateDataChannel",
+                "ssmmessages:OpenControlChannel",
+                "ssmmessages:OpenDataChannel"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": [
+                        "us-east-1",
+                        "us-west-2",
+                        "eu-west-1",
+                        "ap-southeast-1"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "CloudWatchAgentPermissions",
+            "Effect": "Allow",
+            "Action": [
+                "cloudwatch:PutMetricData",
+                "ec2:DescribeVolumes",
+                "ec2:DescribeTags",
+                "logs:PutLogEvents",
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:DescribeLogStreams"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "EC2InstanceConnectPermissions",
+            "Effect": "Allow",
+            "Action": [
+                "ec2-instance-connect:SendSSHPublicKey"
+            ],
+            "Resource": [
+                "arn:aws:ec2:*:*:instance/*"
+            ],
+            "Condition": {
+                "StringEquals": {
+                    "ec2:osuser": [
+                        "ec2-user",
+                        "ssm-user"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "S3AccessForSSMPatching",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject"
+            ],
+            "Resource": [
+                "arn:aws:s3:::aws-ssm-*/*",
+                "arn:aws:s3:::amazon-ssm-*/*",
+                "arn:aws:s3:::amazoncloudwatch-agent/*"
+            ]
+        },
+        {
+            "Sid": "DescribeInstancesForTagging",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DescribeInstances",
+                "ec2:DescribeInstanceAttribute"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "SSMParameterStoreRead",
+            "Effect": "Allow",
+            "Action": [
+                "ssm:GetParameter",
+                "ssm:GetParameters",
+                "ssm:GetParametersByPath"
+            ],
+            "Resource": [
+                "arn:aws:ssm:*:*:parameter/wordpress/*",
+                "arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*"
+            ]
+        },
+        {
+            "Sid": "KMSDecryptForSSM",
+            "Effect": "Allow",
+            "Action": [
+                "kms:Decrypt"
+            ],
+            "Resource": [
+                "arn:aws:kms:*:*:key/*"
+            ],
+            "Condition": {
+                "StringEquals": {
+                    "kms:ViaService": [
+                        "ssm.*.amazonaws.com"
+                    ]
+                }
+            }
+        }
+    ]
+}
