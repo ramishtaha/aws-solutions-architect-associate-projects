@@ -1,521 +1,241 @@
-# Project 02: Create a Serverless API using API Gateway, Lambda, and DynamoDB
+# Project 2: Create a Serverless API using API Gateway, Lambda, and DynamoDB
 
 ## 1. Objective
-Build a complete serverless RESTful API that demonstrates the power of AWS's serverless architecture. You will create a Task Management API that allows users to create, read, update, and delete tasks using HTTP requests. This project teaches you how to design scalable, cost-effective APIs without managing servers, and demonstrates key serverless patterns commonly tested in the SAA-C03 exam.
+Build a complete serverless API that allows you to perform CRUD (Create, Read, Update, Delete) operations on a DynamoDB table through API Gateway endpoints. This project will teach you the fundamentals of serverless architecture, event-driven computing, and how to build scalable APIs without managing servers.
 
 ## 2. AWS Services Used
-- **AWS Lambda** (Serverless compute for API logic)
-- **Amazon API Gateway** (RESTful API endpoint management)
-- **Amazon DynamoDB** (NoSQL database for task storage)
-- **AWS IAM** (Identity and Access Management for security)
-- **Amazon CloudWatch** (Logging and monitoring)
+- **Amazon API Gateway** - RESTful API creation and management
+- **AWS Lambda** - Serverless compute service for API logic
+- **Amazon DynamoDB** - NoSQL database for data storage
+- **AWS IAM** - Identity and Access Management for permissions
+- **Amazon CloudWatch** - Monitoring and logging
 
 ## 3. Difficulty
-**Beginner**
+Beginner
 
 ## 4. Architecture Diagram
 ```
-┌─────────────┐    HTTPS Request     ┌─────────────┐    Invoke      ┌─────────────┐
-│   Client    │ ──────────────────> │ API Gateway │ ─────────────> │   Lambda    │
-│ (Browser/   │                     │  (REST API) │                │  Function   │
-│  Postman)   │ <────────────────── └─────────────┘ <───────────── └─────────────┘
-└─────────────┘    JSON Response                                           │
-                                                                           │
-                                                                           │ Read/Write
-                                                                           ▼
-                                                                   ┌─────────────┐
-                                                                   │  DynamoDB   │
-                                                                   │    Table    │
-                                                                   │   (Tasks)   │
-                                                                   └─────────────┘
-
-API Gateway handles:                Lambda Function handles:       DynamoDB provides:
-- Authentication                   - Business logic               - NoSQL data storage
-- Rate limiting                    - Data validation             - Auto-scaling
-- Request/Response mapping         - CRUD operations              - High availability
-- CORS headers                     - Error handling               - Consistent performance
+┌─────────────┐    ┌─────────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Client    │───▶│  API Gateway    │───▶│   Lambda    │───▶│  DynamoDB   │
+│ (Browser/   │    │   (REST API)    │    │  Function   │    │   Table     │
+│  App/curl)  │◄───│                 │◄───│             │◄───│             │
+└─────────────┘    └─────────────────┘    └─────────────┘    └─────────────┘
+                            │                      │
+                            │                      │
+                            ▼                      ▼
+                   ┌─────────────────┐    ┌─────────────┐
+                   │   CloudWatch    │    │     IAM     │
+                   │     Logs        │    │    Role     │
+                   └─────────────────┘    └─────────────┘
 ```
 
 ## 5. Prerequisites
-
-**Before starting this project, ensure you have completed the [Prerequisites Guide](../PREREQUISITES.md).**
-
-**Project-specific requirements:**
-- Basic understanding of HTTP methods (GET, POST, PUT, DELETE)
+- Ensure you have completed the initial setup detailed in the main [PREREQUISITES.md](../PREREQUISITES.md) file in the repository root.
+- Basic understanding of REST APIs and HTTP methods (GET, POST, PUT, DELETE)
 - Familiarity with JSON data format
-- Python 3.x installed (for reliable Lambda testing)
-- boto3 AWS SDK for Python: `pip3 install boto3` (WSL2/Linux) or `pip install boto3` (Windows)
-- Basic knowledge of REST API concepts (optional, but helpful)
-
-**Setup**: Clone this repository and navigate to this project directory:
-```bash
-# Clone the repository (if you haven't already)
-git clone <repository-url>
-
-# Navigate to this project
-cd aws-solutions-architect-associate-projects/02-serverless-api
-```
 
 ## 6. Step-by-Step Guide
 
-**Important**: All commands in this guide assume you are in the project root directory (`02-serverless-api`). Adjust paths accordingly if you are in a different location.
+### Step 1: Create DynamoDB Table
+1. Open the AWS Management Console and navigate to DynamoDB
+2. Click "Create table"
+3. Configure the table:
+   - **Table name**: `ServerlessAPI-Items`
+   - **Partition key**: `id` (String)
+   - Leave other settings as default (On-demand billing)
+4. Click "Create table" and wait for it to be created
 
-### Step 1: Create DynamoDB Table for Task Storage
+### Step 2: Create IAM Role for Lambda
+1. Navigate to the IAM service in AWS Console
+2. Click "Roles" → "Create role"
+3. Select "AWS service" → "Lambda" → "Next"
+4. Click "Create policy" and switch to JSON tab
+5. Copy and paste the IAM policy from `assets/iam_policy.json`
+6. Name the policy: `ServerlessAPI-Lambda-Policy`
+7. Create the policy and attach it to your role
+8. Name the role: `ServerlessAPI-Lambda-Role`
+9. Create the role
 
-1. **Create DynamoDB Table**
-   ```bash
-   aws dynamodb create-table \
-       --table-name Tasks \
-       --attribute-definitions AttributeName=taskId,AttributeType=S \
-       --key-schema AttributeName=taskId,KeyType=HASH \
-       --billing-mode PAY_PER_REQUEST \
-       --region your-region
+### Step 3: Create Lambda Function
+1. Navigate to AWS Lambda service
+2. Click "Create function"
+3. Configure the function:
+   - **Function name**: `ServerlessAPI-Function`
+   - **Runtime**: Python 3.11
+   - **Execution role**: Use existing role → `ServerlessAPI-Lambda-Role`
+4. Click "Create function"
+5. In the code editor, replace the default code with the content from `assets/lambda_function.py`
+6. Click "Deploy" to save the changes
+
+### Step 4: Test Lambda Function
+1. In the Lambda function console, click "Test"
+2. Create a new test event:
+   - **Event name**: `CreateItemTest`
+   - **Event JSON**:
+   ```json
+   {
+     "httpMethod": "POST",
+     "body": "{\"name\": \"Test Item\", \"description\": \"This is a test item\"}"
+   }
    ```
+3. Click "Test" and verify the function executes successfully
 
-2. **Verify Table Creation**
-   ```bash
-   aws dynamodb describe-table --table-name Tasks --region your-region
-   ```
-   > Wait until the table status shows "ACTIVE" before proceeding
+### Step 5: Create API Gateway
+1. Navigate to API Gateway service
+2. Click "Create API" → "REST API" → "Build"
+3. Configure the API:
+   - **API name**: `ServerlessAPI`
+   - **Description**: `Serverless CRUD API for DynamoDB`
+   - **Endpoint Type**: Regional
+4. Click "Create API"
 
-3. **Test Table with Sample Data** (optional)
-   ```bash
-   aws dynamodb put-item \
-       --table-name Tasks \
-       --item '{"taskId": {"S": "test-123"}, "title": {"S": "Test Task"}, "description": {"S": "This is a test task"}, "status": {"S": "pending"}, "createdAt": {"S": "2024-01-01T00:00:00Z"}}' \
-       --region your-region
-   ```
+### Step 6: Create API Resources and Methods
+1. In your API, click "Actions" → "Create Resource"
+2. Configure resource:
+   - **Resource Name**: `items`
+   - **Resource Path**: `/items`
+   - Enable CORS if needed
+3. Click "Create Resource"
 
-### Step 2: Create IAM Role for Lambda Function
+4. Create individual item resource:
+   - Select `/items` resource
+   - Click "Actions" → "Create Resource"
+   - **Resource Name**: `item`
+   - **Resource Path**: `/{id}`
+   - Click "Create Resource"
 
-1. **Create Trust Policy for Lambda**
-   ```bash
-   aws iam create-role \
-       --role-name LambdaTaskAPIRole \
-       --assume-role-policy-document '{
-         "Version": "2012-10-17",
-         "Statement": [
-           {
-             "Effect": "Allow",
-             "Principal": {
-               "Service": "lambda.amazonaws.com"
-             },
-             "Action": "sts:AssumeRole"
-           }
-         ]
-       }'
-   ```
-
-2. **Attach Basic Lambda Execution Policy**
-   ```bash
-   aws iam attach-role-policy \
-       --role-name LambdaTaskAPIRole \
-       --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-   ```
-
-3. **Create and Attach DynamoDB Access Policy**
-   ```bash
-   aws iam create-policy \
-       --policy-name LambdaDynamoDBPolicy \
-       --policy-document file://assets/iam_policy.json
-   ```
+5. Add methods to `/items` resource:
+   - **GET** (list all items):
+     - Click "Actions" → "Create Method" → "GET"
+     - Integration type: Lambda Function
+     - Lambda Function: `ServerlessAPI-Function`
+     - Click "Save"
    
-   > Note the Policy ARN returned for the next step
+   - **POST** (create new item):
+     - Click "Actions" → "Create Method" → "POST"
+     - Integration type: Lambda Function
+     - Lambda Function: `ServerlessAPI-Function`
+     - Click "Save"
 
-4. **Attach DynamoDB Policy to Role**
-   ```bash
-   aws iam attach-role-policy \
-       --role-name LambdaTaskAPIRole \
-       --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/LambdaDynamoDBPolicy
-   ```
-   > Replace YOUR_ACCOUNT_ID with your actual AWS account ID
-
-### Step 3: Create and Deploy Lambda Function
-
-1. **Create Lambda Function Deployment Package**
-   ```bash
-   # Navigate to the assets directory
-   cd assets
+6. Add methods to `/items/{id}` resource:
+   - **GET** (get specific item):
+     - Click "Actions" → "Create Method" → "GET"
+     - Integration type: Lambda Function
+     - Lambda Function: `ServerlessAPI-Function`
+     - Click "Save"
    
-   # Create deployment package
-   zip lambda-deployment.zip lambda_function.py
+   - **PUT** (update item):
+     - Click "Actions" → "Create Method" → "PUT"
+     - Integration type: Lambda Function
+     - Lambda Function: `ServerlessAPI-Function`
+     - Click "Save"
    
-   # Return to project root
-   cd ..
-   ```
+   - **DELETE** (delete item):
+     - Click "Actions" → "Create Method" → "DELETE"
+     - Integration type: Lambda Function
+     - Lambda Function: `ServerlessAPI-Function`
+     - Click "Save"
 
-2. **Create Lambda Function**
-   ```bash
-   aws lambda create-function \
-       --function-name TaskAPI \
-       --runtime python3.9 \
-       --role arn:aws:iam::YOUR_ACCOUNT_ID:role/LambdaTaskAPIRole \
-       --handler lambda_function.lambda_handler \
-       --zip-file fileb://assets/lambda-deployment.zip \
-       --description "Serverless Task Management API" \
-       --timeout 30 \
-       --region your-region
-   ```
-   > Replace YOUR_ACCOUNT_ID with your actual AWS account ID
+### Step 7: Deploy API
+1. Click "Actions" → "Deploy API"
+2. Create new deployment stage:
+   - **Stage name**: `prod`
+   - **Stage description**: `Production stage`
+3. Click "Deploy"
+4. Note down the **Invoke URL** displayed
 
-3. **Test Lambda Function**
-   
-   Due to encoding issues with AWS CLI across different platforms (especially WSL2), we recommend using the Python script for reliable testing.
-   
-   **Method 1: Python Script Testing (Recommended)**
-   
-   ```bash
-   # Navigate to the assets directory
-   cd assets
-   
-   # For WSL2/Linux
-   python3 test_lambda.py
-   
-   # For Windows PowerShell/CMD
-   python test_lambda.py
-   ```
-   
-   This script will:
-   - Test multiple scenarios (GET all tasks, GET with filters, POST create task)
-   - Provide clear success/failure indicators
-   - Display formatted responses
-   - Give troubleshooting tips if tests fail
-   
-   **Method 2: AWS CLI (Alternative, if no encoding issues)**
-   
-   **For WSL2/Linux:**
-   ```bash
-   aws lambda invoke --function-name TaskAPI --payload fileb://test-payload.json --region your-region response.json
-   cat response.json
-   ```
-   
-   **For Windows PowerShell:**
-   ```powershell
-   aws lambda invoke --function-name TaskAPI --payload file://test-payload.json --region your-region response.json
-   Get-Content response.json
-   ```
-   
-   **Note:** If you encounter encoding errors with AWS CLI, use the Python script instead.
+### Step 8: Test the API
+Use the following curl commands or a tool like Postman to test your API:
 
-### Step 4: Create API Gateway REST API
-
-1. **Create REST API**
-   ```bash
-   aws apigateway create-rest-api \
-       --name TaskManagementAPI \
-       --description "Serverless Task Management API for SAA-C03 Project" \
-       --region your-region
-   ```
-   > Note the API ID returned for subsequent commands
-
-2. **Get Root Resource ID**
-   ```bash
-   aws apigateway get-resources \
-       --rest-api-id YOUR_API_ID \
-       --region your-region
-   ```
-   > Note the root resource ID (usually looks like a random string)
-
-3. **Create 'tasks' Resource**
-   ```bash
-   aws apigateway create-resource \
-       --rest-api-id YOUR_API_ID \
-       --parent-id YOUR_ROOT_RESOURCE_ID \
-       --path-part tasks \
-       --region your-region
-   ```
-   > Note the new resource ID for the tasks resource
-
-4. **Create Individual Task Resource (with path parameter)**
-   ```bash
-   aws apigateway create-resource \
-       --rest-api-id YOUR_API_ID \
-       --parent-id YOUR_TASKS_RESOURCE_ID \
-       --path-part "{taskId}" \
-       --region your-region
-   ```
-
-### Step 5: Configure API Gateway Methods
-
-1. **Create GET Method for All Tasks (GET /tasks)**
-   ```bash
-   aws apigateway put-method \
-       --rest-api-id YOUR_API_ID \
-       --resource-id YOUR_TASKS_RESOURCE_ID \
-       --http-method GET \
-       --authorization-type NONE \
-       --region your-region
-   ```
-
-2. **Create POST Method for Creating Tasks (POST /tasks)**
-   ```bash
-   aws apigateway put-method \
-       --rest-api-id YOUR_API_ID \
-       --resource-id YOUR_TASKS_RESOURCE_ID \
-       --http-method POST \
-       --authorization-type NONE \
-       --region your-region
-   ```
-
-3. **Create GET Method for Single Task (GET /tasks/{taskId})**
-   ```bash
-   aws apigateway put-method \
-       --rest-api-id YOUR_API_ID \
-       --resource-id YOUR_TASKID_RESOURCE_ID \
-       --http-method GET \
-       --authorization-type NONE \
-       --region your-region
-   ```
-
-4. **Create PUT Method for Updating Tasks (PUT /tasks/{taskId})**
-   ```bash
-   aws apigateway put-method \
-       --rest-api-id YOUR_API_ID \
-       --resource-id YOUR_TASKID_RESOURCE_ID \
-       --http-method PUT \
-       --authorization-type NONE \
-       --region your-region
-   ```
-
-5. **Create DELETE Method (DELETE /tasks/{taskId})**
-   ```bash
-   aws apigateway put-method \
-       --rest-api-id YOUR_API_ID \
-       --resource-id YOUR_TASKID_RESOURCE_ID \
-       --http-method DELETE \
-       --authorization-type NONE \
-       --region your-region
-   ```
-
-### Step 6: Integrate API Gateway with Lambda
-
-**For each method created above, you need to set up Lambda integration:**
-
-1. **Example: Set up Integration for GET /tasks**
-   ```bash
-   aws apigateway put-integration \
-       --rest-api-id YOUR_API_ID \
-       --resource-id YOUR_TASKS_RESOURCE_ID \
-       --http-method GET \
-       --type AWS_PROXY \
-       --integration-http-method POST \
-       --uri arn:aws:apigateway:your-region:lambda:path/2015-03-31/functions/arn:aws:lambda:your-region:YOUR_ACCOUNT_ID:function:TaskAPI/invocations \
-       --region your-region
-   ```
-
-2. **Grant API Gateway Permission to Invoke Lambda**
-   ```bash
-   aws lambda add-permission \
-       --function-name TaskAPI \
-       --statement-id api-gateway-invoke-lambda \
-       --action lambda:InvokeFunction \
-       --principal apigateway.amazonaws.com \
-       --source-arn "arn:aws:execute-api:your-region:YOUR_ACCOUNT_ID:YOUR_API_ID/*/*/*" \
-       --region your-region
-   ```
-
-3. **Repeat integration setup for all methods** (POST, PUT, DELETE)
-   > Use the same integration command but change the resource-id and http-method parameters
-
-### Step 7: Deploy API Gateway
-
-1. **Deploy API to Stage**
-   ```bash
-   aws apigateway create-deployment \
-       --rest-api-id YOUR_API_ID \
-       --stage-name prod \
-       --stage-description "Production stage for Task API" \
-       --description "Initial deployment of Task Management API" \
-       --region your-region
-   ```
-
-2. **Get API Endpoint URL**
-   ```bash
-   echo "Your API endpoint: https://YOUR_API_ID.execute-api.your-region.amazonaws.com/prod/tasks"
-   ```
-
-### Step 8: Test Your Serverless API
-
-1. **Test GET All Tasks** (should return empty array initially)
-   ```bash
-   curl -X GET https://YOUR_API_ID.execute-api.your-region.amazonaws.com/prod/tasks
-   ```
-
-2. **Test POST Create New Task**
-   ```bash
-   curl -X POST https://YOUR_API_ID.execute-api.your-region.amazonaws.com/prod/tasks \
-        -H "Content-Type: application/json" \
-        -d '{
-          "title": "Learn AWS Lambda",
-          "description": "Complete the serverless API project for SAA-C03 prep",
-          "status": "pending"
-        }'
-   ```
-
-3. **Test GET Single Task** (use the taskId returned from POST)
-   ```bash
-   curl -X GET https://YOUR_API_ID.execute-api.your-region.amazonaws.com/prod/tasks/TASK_ID_HERE
-   ```
-
-4. **Test PUT Update Task**
-   ```bash
-   curl -X PUT https://YOUR_API_ID.execute-api.your-region.amazonaws.com/prod/tasks/TASK_ID_HERE \
-        -H "Content-Type: application/json" \
-        -d '{
-          "title": "Learn AWS Lambda - Updated",
-          "description": "Complete the serverless API project and understand Lambda pricing",
-          "status": "in-progress"
-        }'
-   ```
-
-5. **Test DELETE Task**
-   ```bash
-   curl -X DELETE https://YOUR_API_ID.execute-api.your-region.amazonaws.com/prod/tasks/TASK_ID_HERE
-   ```
-
-### Troubleshooting Common Issues
-
-**Problem**: AWS CLI encoding errors (WSL2/Linux/Windows)
-```
-InvalidRequestContentException: Could not parse payload into json
-```
-OR
-```
-Invalid base64: "..."
-```
-OR
-```
-Unexpected character ((CTRL-CHAR, code 134))
-```
-
-**Solution**: Use the Python script instead of AWS CLI:
+1. **Create an item** (POST):
 ```bash
-# WSL2/Linux
-python3 test_lambda.py
-
-# Windows
-python test_lambda.py
+curl -X POST [YOUR_INVOKE_URL]/items \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Sample Item", "description": "This is a sample item"}'
 ```
 
-**Problem**: "ModuleNotFoundError: No module named 'boto3'"
-**Solution**: Install the AWS SDK for Python:
+2. **Get all items** (GET):
 ```bash
-# WSL2/Linux
-pip3 install boto3
-
-# Windows
-pip install boto3
+curl -X GET [YOUR_INVOKE_URL]/items
 ```
 
-**Problem**: Lambda function timeout or error in Python script
-**Solution**: Check CloudWatch logs:
+3. **Get specific item** (GET):
 ```bash
-aws logs describe-log-groups --log-group-name-prefix "/aws/lambda/TaskAPI"
+curl -X GET [YOUR_INVOKE_URL]/items/[ITEM_ID]
 ```
 
-**Problem**: Python script shows "AWS SDK initialization failed"
-**Solution**: Configure AWS credentials:
+4. **Update an item** (PUT):
 ```bash
-aws configure
+curl -X PUT [YOUR_INVOKE_URL]/items/[ITEM_ID] \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Updated Item", "description": "This item has been updated"}'
 ```
 
-**Problem**: Lambda function timeout or error
-**Solution**: Check CloudWatch logs:
+5. **Delete an item** (DELETE):
 ```bash
-aws logs describe-log-groups --log-group-name-prefix "/aws/lambda/TaskAPI"
-aws logs get-log-events --log-group-name "/aws/lambda/TaskAPI" --log-stream-name "LATEST"
+curl -X DELETE [YOUR_INVOKE_URL]/items/[ITEM_ID]
 ```
 
 ## 7. Learning Materials & Key Concepts
 
-- **Serverless Architecture Benefits:** This project demonstrates the "No Server Management" principle - you focus purely on code and business logic. AWS handles scaling, patching, and infrastructure management. This is a key cost-optimization pattern in SAA-C03, especially for variable or unpredictable workloads.
+- **Serverless Computing:** Learn how serverless architecture eliminates the need to provision and manage servers. AWS Lambda automatically scales your application and charges only for the compute time you consume. This is essential for the SAA-C03 exam as serverless is a key architectural pattern for building cost-effective, scalable solutions.
 
-- **API Gateway as a Managed Service:** API Gateway provides built-in features like rate limiting, authentication, CORS handling, and request/response transformation. Understanding when to use API Gateway vs. Application Load Balancer (ALB) is crucial for the exam - API Gateway is ideal for serverless and microservices architectures.
+- **IAM Execution Roles:** Understand how AWS services authenticate with each other using IAM roles rather than embedding credentials in code. The Lambda execution role grants your function the minimum necessary permissions to access DynamoDB and CloudWatch, following the principle of least privilege - a critical security concept in the SAA-C03 exam.
 
-- **Lambda Function Pricing Model:** Lambda charges only for compute time consumed (pay-per-request). No charges when code isn't running. The first 1 million requests per month are free. This makes it extremely cost-effective for APIs with sporadic traffic patterns.
+- **API Gateway Integration Patterns:** Explore how API Gateway acts as a "front door" for your applications, handling request routing, authentication, rate limiting, and transformations. Understanding when to use API Gateway versus Application Load Balancer is a common exam topic.
 
-- **DynamoDB as a Serverless Database:** DynamoDB automatically scales read/write capacity, provides single-digit millisecond latency, and offers built-in security features. The key exam concept is understanding when to choose DynamoDB (flexible scaling, serverless) vs. RDS (complex queries, ACID transactions).
+- **DynamoDB Design Patterns:** Learn why DynamoDB is chosen for serverless applications - it's fully managed, scales automatically, and integrates seamlessly with Lambda. Understanding NoSQL design patterns and when to choose DynamoDB over RDS is crucial for the exam.
 
-- **IAM Best Practices in Serverless:** The Lambda execution role follows the principle of least privilege - it only has permissions to write logs to CloudWatch and perform specific DynamoDB operations. This is a critical security pattern tested in SAA-C03.
-
-- **Event-Driven Architecture:** API Gateway triggers Lambda functions based on HTTP requests. This loose coupling allows each component to scale independently and makes the architecture highly resilient to failure.
-
-- **JSON Data Format and REST Principles:** The API follows RESTful conventions (GET for retrieval, POST for creation, PUT for updates, DELETE for removal) and uses JSON for data exchange, which are industry standards for web APIs.
+- **Event-Driven Architecture:** This project demonstrates how different AWS services communicate through events (HTTP requests triggering Lambda functions), which is a fundamental pattern in modern cloud architectures covered extensively in the SAA-C03 exam.
 
 ## 8. Cost & Free Tier Eligibility
 
 **Free Tier Coverage:**
-- **Lambda:** 1 million free requests per month + 400,000 GB-seconds of compute time
-- **API Gateway:** 1 million API calls per month for REST APIs
-- **DynamoDB:** 25 GB of storage, 25 units of read/write capacity
-- **CloudWatch:** 10 custom metrics, 1 million API requests
+- **Lambda**: 1 million requests per month and 400,000 GB-seconds of compute time
+- **API Gateway**: 1 million API calls per month for the first 12 months
+- **DynamoDB**: 25 GB storage and 25 provisioned read/write capacity units (enough for this project)
+- **CloudWatch**: Basic monitoring and 5 GB of log ingestion
 
 **Potential Costs:**
-- **Lambda:** $0.20 per 1M requests + $0.0000166667 per GB-second after free tier
-- **API Gateway:** $3.50 per million API calls after free tier
-- **DynamoDB:** $0.25 per GB per month for storage + read/write capacity costs
-- **Data Transfer:** Standard AWS data transfer charges apply
-
-**Estimated Monthly Cost:** For a typical development/learning project with moderate usage, expect $0-2 per month within free tier limits. Production APIs with higher traffic might cost $10-50+ depending on request volume.
+- This project should remain within Free Tier limits for learning purposes
+- If you exceed Free Tier limits:
+  - Lambda: $0.20 per 1 million requests + $0.0000166667 per GB-second
+  - API Gateway: $3.50 per million requests after Free Tier
+  - DynamoDB: $0.25 per GB storage per month for additional storage
 
 ## 9. Cleanup Instructions
 
-⚠️ **Important:** Follow these steps in order to avoid dependency errors and ensure complete cleanup.
+**⚠️ Important: Delete resources in this exact order to avoid errors:**
 
-1. **Delete API Gateway**
-   ```bash
-   aws apigateway delete-rest-api --rest-api-id YOUR_API_ID --region your-region
-   ```
+1. **Delete API Gateway:**
+   - Go to API Gateway console
+   - Select your `ServerlessAPI`
+   - Click "Actions" → "Delete API"
+   - Confirm deletion
 
-2. **Delete Lambda Function**
-   ```bash
-   aws lambda delete-function --function-name TaskAPI --region your-region
-   ```
+2. **Delete Lambda Function:**
+   - Go to Lambda console
+   - Select `ServerlessAPI-Function`
+   - Click "Actions" → "Delete function"
+   - Type "delete" to confirm
 
-3. **Delete DynamoDB Table**
-   ```bash
-   aws dynamodb delete-table --table-name Tasks --region your-region
-   ```
+3. **Delete IAM Role and Policy:**
+   - Go to IAM console → Roles
+   - Select `ServerlessAPI-Lambda-Role`
+   - Click "Delete role"
+   - Go to Policies → Select `ServerlessAPI-Lambda-Policy`
+   - Click "Actions" → "Delete"
 
-4. **Detach and Delete IAM Policies**
-   ```bash
-   # Detach policies from role
-   aws iam detach-role-policy --role-name LambdaTaskAPIRole --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-   aws iam detach-role-policy --role-name LambdaTaskAPIRole --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/LambdaDynamoDBPolicy
-   
-   # Delete custom policy
-   aws iam delete-policy --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/LambdaDynamoDBPolicy
-   
-   # Delete IAM role
-   aws iam delete-role --role-name LambdaTaskAPIRole
-   ```
+4. **Delete DynamoDB Table:**
+   - Go to DynamoDB console
+   - Select `ServerlessAPI-Items` table
+   - Click "Delete table"
+   - Type "confirm" to delete
 
-5. **Delete Local Files**
-   ```bash
-   # Navigate to project root
-   cd ..
-   
-   # Remove deployment package and response files
-   rm assets/lambda-deployment.zip
-   rm response.json
-   
-   # On Windows, use:
-   # del assets\lambda-deployment.zip
-   # del response.json
-   ```
+5. **Verify CloudWatch Logs Cleanup (Optional):**
+   - Go to CloudWatch → Log groups
+   - Delete any log groups starting with `/aws/lambda/ServerlessAPI-Function`
 
 ## 10. Associated Project Files
-
-The following files are provided in the `assets` folder:
-
-- `assets/lambda_function.py` - Complete Python code for the Lambda function handling all CRUD operations
-- `assets/iam_policy.json` - IAM policy granting Lambda function access to DynamoDB operations
-- `assets/test_lambda.py` - Python script for reliable Lambda function testing (recommended)
-- `assets/test-payload.json` - Simple JSON payload for AWS CLI testing (if needed)
-- `assets/test-post-payload.json` - Sample POST request payload for AWS CLI testing
-- `assets/test_requests.md` - Sample API requests for testing (curl commands and JSON payloads)
-- `assets/api_documentation.md` - Complete API documentation with request/response examples
-
----
-
-**Next Project:** Once you've completed this project and cleaned up the resources, proceed to [Project 03: Decouple an Application with SQS and Lambda](../03-sqs-decoupling/README.md) to learn about message queuing and application decoupling patterns.
+- `lambda_function.py`: Complete Python code for the Lambda function handling all CRUD operations
+- `iam_policy.json`: IAM execution role policy granting necessary DynamoDB and CloudWatch permissions

@@ -2,30 +2,24 @@
     "Version": "2012-10-17",
     "Statement": [
         {
-            "Sid": "DynamoDBTaskTableAccess",
             "Effect": "Allow",
             "Action": [
-                "dynamodb:GetItem",
                 "dynamodb:PutItem",
+                "dynamodb:GetItem",
                 "dynamodb:UpdateItem",
                 "dynamodb:DeleteItem",
-                "dynamodb:Scan",
-                "dynamodb:Query"
+                "dynamodb:Scan"
             ],
-            "Resource": [
-                "arn:aws:dynamodb:*:*:table/Tasks",
-                "arn:aws:dynamodb:*:*:table/Tasks/index/*"
-            ]
+            "Resource": "arn:aws:dynamodb:*:*:table/ServerlessAPI-Items"
         },
         {
-            "Sid": "DynamoDBDescribeTable",
             "Effect": "Allow",
             "Action": [
-                "dynamodb:DescribeTable"
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
             ],
-            "Resource": [
-                "arn:aws:dynamodb:*:*:table/Tasks"
-            ]
+            "Resource": "arn:aws:logs:*:*:*"
         }
     ]
 }

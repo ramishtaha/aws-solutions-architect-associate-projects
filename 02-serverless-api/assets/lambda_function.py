@@ -3,305 +3,217 @@ import boto3
 import uuid
 from datetime import datetime
 from decimal import Decimal
-import logging
 
-# Configure logging
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-# Initialize DynamoDB resource
+# Initialize DynamoDB client
 dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table('Tasks')
-
-class DecimalEncoder(json.JSONEncoder):
-    """Helper class to handle Decimal types from DynamoDB"""
-    def default(self, obj):
-        if isinstance(obj, Decimal):
-            return float(obj)
-        return super(DecimalEncoder, self).default(obj)
+table = dynamodb.Table('ServerlessAPI-Items')
 
 def lambda_handler(event, context):
     """
-    AWS Lambda handler for Task Management API
-    Handles CRUD operations for tasks stored in DynamoDB
-    
-    Expected API Gateway event structure with proxy integration
+    Main Lambda handler for CRUD operations on DynamoDB
+    Supports GET, POST, PUT, DELETE operations
     """
     
-    logger.info(f"Received event: {json.dumps(event)}")
-    
     try:
-        # Extract HTTP method and path
-        http_method = event.get('httpMethod', '')
+        # Extract HTTP method and path parameters
+        http_method = event.get('httpMethod')
         path_parameters = event.get('pathParameters') or {}
-        query_parameters = event.get('queryStringParameters') or {}
         
-        # Parse request body if present
-        body = {}
-        if event.get('body'):
-            try:
-                body = json.loads(event['body'])
-            except json.JSONDecodeError:
-                return create_response(400, {'error': 'Invalid JSON in request body'})
-        
-        # Route to appropriate handler based on HTTP method and path
+        # Route requests based on HTTP method
         if http_method == 'GET':
-            if path_parameters.get('taskId'):
-                # GET /tasks/{taskId} - Get single task
-                return get_task(path_parameters['taskId'])
+            if 'id' in path_parameters:
+                # GET /items/{id} - Get specific item
+                return get_item(path_parameters['id'])
             else:
-                # GET /tasks - Get all tasks
-                return get_all_tasks(query_parameters)
+                # GET /items - Get all items
+                return get_all_items()
                 
         elif http_method == 'POST':
-            # POST /tasks - Create new task
-            return create_task(body)
+            # POST /items - Create new item
+            return create_item(event.get('body'))
             
         elif http_method == 'PUT':
-            # PUT /tasks/{taskId} - Update existing task
-            task_id = path_parameters.get('taskId')
-            if not task_id:
-                return create_response(400, {'error': 'taskId is required for PUT requests'})
-            return update_task(task_id, body)
+            # PUT /items/{id} - Update existing item
+            return update_item(path_parameters['id'], event.get('body'))
             
         elif http_method == 'DELETE':
-            # DELETE /tasks/{taskId} - Delete task
-            task_id = path_parameters.get('taskId')
-            if not task_id:
-                return create_response(400, {'error': 'taskId is required for DELETE requests'})
-            return delete_task(task_id)
+            # DELETE /items/{id} - Delete item
+            return delete_item(path_parameters['id'])
             
         else:
-            return create_response(405, {'error': f'Method {http_method} not allowed'})
+            return create_response(405, {'error': 'Method not allowed'})
             
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        return create_response(500, {'error': 'Internal server error'})
+        print(f"Error: {str(e)}")
+        return create_response(500, {'error': 'Internal server error', 'details': str(e)})
 
-def create_response(status_code, body, headers=None):
-    """Create standardized API Gateway response"""
-    default_headers = {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',  # Enable CORS for web clients
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-Amz-Date, Authorization, X-Api-Key'
-    }
-    
-    if headers:
-        default_headers.update(headers)
-    
-    return {
-        'statusCode': status_code,
-        'headers': default_headers,
-        'body': json.dumps(body, cls=DecimalEncoder)
-    }
-
-def get_all_tasks(query_parameters):
-    """Get all tasks with optional filtering"""
+def get_all_items():
+    """
+    Retrieve all items from DynamoDB table
+    """
     try:
-        logger.info("Getting all tasks")
+        response = table.scan()
+        items = response.get('Items', [])
         
-        # Get optional query parameters
-        status_filter = query_parameters.get('status')
-        limit = query_parameters.get('limit', '50')  # Default limit of 50
-        
-        try:
-            limit = int(limit)
-            if limit > 100:  # Cap at 100 for performance
-                limit = 100
-        except ValueError:
-            limit = 50
-        
-        # Build scan parameters
-        scan_params = {'Limit': limit}
-        
-        # Add status filter if provided
-        if status_filter:
-            scan_params['FilterExpression'] = boto3.dynamodb.conditions.Attr('status').eq(status_filter)
-        
-        # Scan the table
-        response = table.scan(**scan_params)
-        tasks = response.get('Items', [])
-        
-        # Sort by creation date (newest first)
-        tasks.sort(key=lambda x: x.get('createdAt', ''), reverse=True)
+        # Convert Decimal objects to float for JSON serialization
+        items = convert_decimals(items)
         
         return create_response(200, {
-            'tasks': tasks,
-            'count': len(tasks),
-            'message': f'Retrieved {len(tasks)} tasks'
+            'items': items,
+            'count': len(items)
         })
         
     except Exception as e:
-        logger.error(f"Error getting all tasks: {str(e)}")
-        return create_response(500, {'error': 'Failed to retrieve tasks'})
+        print(f"Error getting all items: {str(e)}")
+        return create_response(500, {'error': 'Could not retrieve items'})
 
-def get_task(task_id):
-    """Get a single task by ID"""
+def get_item(item_id):
+    """
+    Retrieve a specific item by ID
+    """
     try:
-        logger.info(f"Getting task: {task_id}")
-        
-        response = table.get_item(Key={'taskId': task_id})
+        response = table.get_item(Key={'id': item_id})
         
         if 'Item' not in response:
-            return create_response(404, {'error': f'Task {task_id} not found'})
+            return create_response(404, {'error': 'Item not found'})
         
-        return create_response(200, {
-            'task': response['Item'],
-            'message': f'Task {task_id} retrieved successfully'
-        })
+        item = convert_decimals(response['Item'])
+        return create_response(200, item)
         
     except Exception as e:
-        logger.error(f"Error getting task {task_id}: {str(e)}")
-        return create_response(500, {'error': 'Failed to retrieve task'})
+        print(f"Error getting item {item_id}: {str(e)}")
+        return create_response(500, {'error': 'Could not retrieve item'})
 
-def create_task(body):
-    """Create a new task"""
+def create_item(body):
+    """
+    Create a new item in DynamoDB
+    """
     try:
-        logger.info(f"Creating new task with data: {body}")
+        if not body:
+            return create_response(400, {'error': 'Request body is required'})
+        
+        # Parse JSON body
+        data = json.loads(body)
         
         # Validate required fields
-        if not body.get('title'):
-            return create_response(400, {'error': 'title is required'})
+        if 'name' not in data:
+            return create_response(400, {'error': 'Name field is required'})
         
-        # Generate unique task ID
-        task_id = str(uuid.uuid4())
-        current_time = datetime.utcnow().isoformat() + 'Z'
+        # Generate unique ID and timestamp
+        item_id = str(uuid.uuid4())
+        timestamp = datetime.utcnow().isoformat()
         
-        # Create task item with default values
-        task = {
-            'taskId': task_id,
-            'title': body['title'],
-            'description': body.get('description', ''),
-            'status': body.get('status', 'pending'),
-            'priority': body.get('priority', 'medium'),
-            'createdAt': current_time,
-            'updatedAt': current_time
+        # Prepare item for DynamoDB
+        item = {
+            'id': item_id,
+            'name': data['name'],
+            'description': data.get('description', ''),
+            'created_at': timestamp,
+            'updated_at': timestamp
         }
         
-        # Validate status
-        valid_statuses = ['pending', 'in-progress', 'completed', 'cancelled']
-        if task['status'] not in valid_statuses:
-            return create_response(400, {
-                'error': f'Invalid status. Must be one of: {", ".join(valid_statuses)}'
-            })
-        
-        # Validate priority
-        valid_priorities = ['low', 'medium', 'high', 'urgent']
-        if task['priority'] not in valid_priorities:
-            return create_response(400, {
-                'error': f'Invalid priority. Must be one of: {", ".join(valid_priorities)}'
-            })
+        # Add any additional fields from the request
+        for key, value in data.items():
+            if key not in ['id', 'created_at', 'updated_at']:
+                item[key] = value
         
         # Save to DynamoDB
-        table.put_item(Item=task)
+        table.put_item(Item=item)
         
-        logger.info(f"Task created successfully: {task_id}")
-        return create_response(201, {
-            'task': task,
-            'message': f'Task {task_id} created successfully'
-        })
+        return create_response(201, item)
         
+    except json.JSONDecodeError:
+        return create_response(400, {'error': 'Invalid JSON in request body'})
     except Exception as e:
-        logger.error(f"Error creating task: {str(e)}")
-        return create_response(500, {'error': 'Failed to create task'})
+        print(f"Error creating item: {str(e)}")
+        return create_response(500, {'error': 'Could not create item'})
 
-def update_task(task_id, body):
-    """Update an existing task"""
+def update_item(item_id, body):
+    """
+    Update an existing item in DynamoDB
+    """
     try:
-        logger.info(f"Updating task {task_id} with data: {body}")
+        if not body:
+            return create_response(400, {'error': 'Request body is required'})
         
-        # Check if task exists
-        response = table.get_item(Key={'taskId': task_id})
-        if 'Item' not in response:
-            return create_response(404, {'error': f'Task {task_id} not found'})
+        # Parse JSON body
+        data = json.loads(body)
         
-        existing_task = response['Item']
-        current_time = datetime.utcnow().isoformat() + 'Z'
+        # Check if item exists
+        existing_item = table.get_item(Key={'id': item_id})
+        if 'Item' not in existing_item:
+            return create_response(404, {'error': 'Item not found'})
         
-        # Prepare update expression
-        update_expression = "SET updatedAt = :updated_at"
-        expression_values = {':updated_at': current_time}
+        # Build update expression
+        update_expression = "SET updated_at = :timestamp"
+        expression_values = {':timestamp': datetime.utcnow().isoformat()}
         
-        # Add fields to update if provided
-        if 'title' in body:
-            update_expression += ", title = :title"
-            expression_values[':title'] = body['title']
+        # Add fields to update
+        for key, value in data.items():
+            if key not in ['id', 'created_at']:  # Don't allow updating these fields
+                update_expression += f", {key} = :{key}"
+                expression_values[f":{key}"] = value
         
-        if 'description' in body:
-            update_expression += ", description = :description"
-            expression_values[':description'] = body['description']
+        # Update item in DynamoDB
+        response = table.update_item(
+            Key={'id': item_id},
+            UpdateExpression=update_expression,
+            ExpressionAttributeValues=expression_values,
+            ReturnValues='ALL_NEW'
+        )
         
-        if 'status' in body:
-            valid_statuses = ['pending', 'in-progress', 'completed', 'cancelled']
-            if body['status'] not in valid_statuses:
-                return create_response(400, {
-                    'error': f'Invalid status. Must be one of: {", ".join(valid_statuses)}'
-                })
-            update_expression += ", #status = :status"
-            expression_values[':status'] = body['status']
+        updated_item = convert_decimals(response['Attributes'])
+        return create_response(200, updated_item)
         
-        if 'priority' in body:
-            valid_priorities = ['low', 'medium', 'high', 'urgent']
-            if body['priority'] not in valid_priorities:
-                return create_response(400, {
-                    'error': f'Invalid priority. Must be one of: {", ".join(valid_priorities)}'
-                })
-            update_expression += ", priority = :priority"
-            expression_values[':priority'] = body['priority']
-        
-        # Note: Using #status as expression attribute name because 'status' is a reserved keyword in DynamoDB
-        expression_names = {'#status': 'status'} if 'status' in body else None
-        
-        # Update the item
-        update_params = {
-            'Key': {'taskId': task_id},
-            'UpdateExpression': update_expression,
-            'ExpressionAttributeValues': expression_values,
-            'ReturnValues': 'ALL_NEW'
-        }
-        
-        if expression_names:
-            update_params['ExpressionAttributeNames'] = expression_names
-        
-        response = table.update_item(**update_params)
-        
-        logger.info(f"Task updated successfully: {task_id}")
-        return create_response(200, {
-            'task': response['Attributes'],
-            'message': f'Task {task_id} updated successfully'
-        })
-        
+    except json.JSONDecodeError:
+        return create_response(400, {'error': 'Invalid JSON in request body'})
     except Exception as e:
-        logger.error(f"Error updating task {task_id}: {str(e)}")
-        return create_response(500, {'error': 'Failed to update task'})
+        print(f"Error updating item {item_id}: {str(e)}")
+        return create_response(500, {'error': 'Could not update item'})
 
-def delete_task(task_id):
-    """Delete a task"""
+def delete_item(item_id):
+    """
+    Delete an item from DynamoDB
+    """
     try:
-        logger.info(f"Deleting task: {task_id}")
+        # Check if item exists
+        existing_item = table.get_item(Key={'id': item_id})
+        if 'Item' not in existing_item:
+            return create_response(404, {'error': 'Item not found'})
         
-        # Check if task exists
-        response = table.get_item(Key={'taskId': task_id})
-        if 'Item' not in response:
-            return create_response(404, {'error': f'Task {task_id} not found'})
+        # Delete the item
+        table.delete_item(Key={'id': item_id})
         
-        # Delete the task
-        table.delete_item(Key={'taskId': task_id})
-        
-        logger.info(f"Task deleted successfully: {task_id}")
-        return create_response(200, {
-            'message': f'Task {task_id} deleted successfully'
-        })
+        return create_response(200, {'message': f'Item {item_id} deleted successfully'})
         
     except Exception as e:
-        logger.error(f"Error deleting task {task_id}: {str(e)}")
-        return create_response(500, {'error': 'Failed to delete task'})
+        print(f"Error deleting item {item_id}: {str(e)}")
+        return create_response(500, {'error': 'Could not delete item'})
 
-# Additional utility function for API Gateway OPTIONS method (CORS preflight)
-def handle_options():
-    """Handle CORS preflight requests"""
-    return create_response(200, {}, {
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-Amz-Date, Authorization, X-Api-Key'
-    })
+def create_response(status_code, body):
+    """
+    Create a standardized API Gateway response
+    """
+    return {
+        'statusCode': status_code,
+        'headers': {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',  # Enable CORS
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+        },
+        'body': json.dumps(body, default=str)
+    }
+
+def convert_decimals(obj):
+    """
+    Convert DynamoDB Decimal objects to float for JSON serialization
+    """
+    if isinstance(obj, list):
+        return [convert_decimals(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: convert_decimals(value) for key, value in obj.items()}
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    else:
+        return obj
