@@ -45,18 +45,30 @@ Beginner
    - Leave other settings as default (On-demand billing)
 4. Click "Create table" and wait for it to be created
 
-### Step 2: Create IAM Role for Lambda
+### Step 2: Create IAM Policy for Lambda
 1. Navigate to the IAM service in AWS Console
-2. Click "Roles" → "Create role"
-3. Select "AWS service" → "Lambda" → "Next"
-4. Click "Create policy" and switch to JSON tab
-5. Copy and paste the IAM policy from `assets/iam_policy.json`
-6. Name the policy: `ServerlessAPI-Lambda-Policy`
-7. Create the policy and attach it to your role
-8. Name the role: `ServerlessAPI-Lambda-Role`
-9. Create the role
+2. Click "Policies" → "Create policy"
+3. Click the "JSON" tab
+4. Copy and paste the IAM policy from `assets/iam_policy.json`
+5. Click "Next"
+6. Configure policy details:
+   - **Policy name**: `ServerlessAPI-Lambda-Policy`
+   - **Description**: `Policy for ServerlessAPI Lambda function to access DynamoDB and CloudWatch`
+7. Click "Create policy"
 
-### Step 3: Create Lambda Function
+### Step 3: Create IAM Role for Lambda
+1. In IAM console, click "Roles" → "Create role"
+2. Select "AWS service" → "Lambda" → "Next"
+3. In the permissions policies section:
+   - Search for `ServerlessAPI-Lambda-Policy`
+   - ✅ Check the box next to your policy
+   - Click "Next"
+4. Configure role details:
+   - **Role name**: `ServerlessAPI-Lambda-Role`
+   - **Description**: `Execution role for ServerlessAPI Lambda function`
+5. Click "Create role"
+
+### Step 4: Create Lambda Function
 1. Navigate to AWS Lambda service
 2. Click "Create function"
 3. Configure the function:
@@ -67,7 +79,7 @@ Beginner
 5. In the code editor, replace the default code with the content from `assets/lambda_function.py`
 6. Click "Deploy" to save the changes
 
-### Step 4: Test Lambda Function
+### Step 5: Test Lambda Function
 1. In the Lambda function console, click "Test"
 2. Create a new test event:
    - **Event name**: `CreateItemTest`
@@ -80,7 +92,7 @@ Beginner
    ```
 3. Click "Test" and verify the function executes successfully
 
-### Step 5: Create API Gateway
+### Step 6: Create API Gateway
 1. Navigate to API Gateway service
 2. Click "Create API" → "REST API" → "Build"
 3. Configure the API:
@@ -89,31 +101,36 @@ Beginner
    - **Endpoint Type**: Regional
 4. Click "Create API"
 
-### Step 6: Create API Resources and Methods
+### Step 7: Create API Resources and Methods
+
+**Note:** The modern API Gateway console auto-generates the resource path based on the resource name. When you enter `{id}` as the resource name, it automatically creates the correct path parameter.
+
 1. In your API, click "Actions" → "Create Resource"
 2. Configure resource:
    - **Resource Name**: `items`
-   - **Resource Path**: `/items`
+   - **Resource Path**: `/items` (auto-populated)
    - Enable CORS if needed
 3. Click "Create Resource"
 
 4. Create individual item resource:
    - Select `/items` resource
    - Click "Actions" → "Create Resource"
-   - **Resource Name**: `item`
-   - **Resource Path**: `/{id}`
+   - **Resource Name**: `{id}` (include the curly braces)
+   - **Resource Path**: The dropdown will automatically populate with `/{id}`
    - Click "Create Resource"
 
 5. Add methods to `/items` resource:
    - **GET** (list all items):
      - Click "Actions" → "Create Method" → "GET"
      - Integration type: Lambda Function
+     - **✅ Check "Use Lambda Proxy integration"** (CRITICAL!)
      - Lambda Function: `ServerlessAPI-Function`
      - Click "Save"
    
    - **POST** (create new item):
      - Click "Actions" → "Create Method" → "POST"
      - Integration type: Lambda Function
+     - **✅ Check "Use Lambda Proxy integration"** (CRITICAL!)
      - Lambda Function: `ServerlessAPI-Function`
      - Click "Save"
 
@@ -121,22 +138,28 @@ Beginner
    - **GET** (get specific item):
      - Click "Actions" → "Create Method" → "GET"
      - Integration type: Lambda Function
+     - **✅ Check "Use Lambda Proxy integration"** (CRITICAL!)
      - Lambda Function: `ServerlessAPI-Function`
      - Click "Save"
    
    - **PUT** (update item):
      - Click "Actions" → "Create Method" → "PUT"
      - Integration type: Lambda Function
+     - **✅ Check "Use Lambda Proxy integration"** (CRITICAL!)
      - Lambda Function: `ServerlessAPI-Function`
      - Click "Save"
    
    - **DELETE** (delete item):
      - Click "Actions" → "Create Method" → "DELETE"
      - Integration type: Lambda Function
+     - **✅ Check "Use Lambda Proxy integration"** (CRITICAL!)
      - Lambda Function: `ServerlessAPI-Function`
      - Click "Save"
 
-### Step 7: Deploy API
+### Step 8: Deploy API
+
+**⚠️ CRITICAL:** You must deploy the API after creating all methods for changes to take effect.
+
 1. Click "Actions" → "Deploy API"
 2. Create new deployment stage:
    - **Stage name**: `prod`
@@ -144,7 +167,15 @@ Beginner
 3. Click "Deploy"
 4. Note down the **Invoke URL** displayed
 
-### Step 8: Test the API
+**Important Notes:**
+- Always redeploy after making any changes to methods or configurations
+- If you get "Missing Authentication Token" errors, verify you're using the correct endpoint path (e.g., `/prod/items` not just `/prod`)
+- If you get "Method not allowed" errors, ensure Lambda Proxy Integration is enabled and the API is redeployed
+
+### Step 9: Test the API
+
+**Before testing:** Ensure your API is deployed and you're using the correct endpoint URLs with `/items` path.
+
 Use the following curl commands or a tool like Postman to test your API:
 
 1. **Create an item** (POST):
@@ -175,6 +206,11 @@ curl -X PUT [YOUR_INVOKE_URL]/items/[ITEM_ID] \
 ```bash
 curl -X DELETE [YOUR_INVOKE_URL]/items/[ITEM_ID]
 ```
+
+**Troubleshooting Common Errors:**
+- **"Missing Authentication Token"**: Check that you're using the full path (e.g., `/prod/items` not `/prod`)
+- **"Method not allowed"**: Verify Lambda Proxy Integration is enabled and API is deployed
+- **"Internal server error"**: Check Lambda function logs in CloudWatch
 
 ## 7. Learning Materials & Key Concepts
 
