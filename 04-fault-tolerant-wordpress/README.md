@@ -1,217 +1,422 @@
 # Project 4: Deploy a fault-tolerant WordPress site using EC2, an Application Load Balancer (ALB), and an RDS Multi-AZ database in a custom VPC
 
 ## 1. Objective
-Build and understand a highly available, fault-tolerant WordPress web application on AWS. You'll create a custom VPC spanning two Availability Zones, deploy an Application Load Balancer in public subnets, place stateless EC2 web servers in an Auto Scaling Group across private subnets, and connect them to a Multi-AZ Amazon RDS MySQL database. You'll learn core SAA concepts: high availability vs. fault tolerance, stateless architecture, VPC networking, security groups, IAM roles, and elasticity with ALB + ASG.
+In this project, you will build a highly available, fault-tolerant WordPress website using AWS best practices. You'll create a custom VPC with public and private subnets across multiple Availability Zones, deploy WordPress on EC2 instances behind an Application Load Balancer, and use an RDS Multi-AZ MySQL database for data persistence. This project demonstrates enterprise-grade architecture patterns including high availability, fault tolerance, and proper security practices with network isolation.
+
+Key learning outcomes:
+- Design and implement a multi-tier architecture in AWS
+- Configure VPC networking with public and private subnets
+- Set up Application Load Balancer for high availability
+- Deploy RDS Multi-AZ for database fault tolerance
+- Implement proper security groups and NACLs
+- Configure Auto Scaling for dynamic capacity management
 
 ## 2. AWS Services Used
-- Amazon VPC (VPC, Subnets, Route Tables, Internet Gateway, NAT Gateway, Elastic IP)
-- Amazon EC2 (Launch Template, Auto Scaling Group)
-- Application Load Balancer (Elastic Load Balancing)
-- Amazon RDS for MySQL (Multi-AZ)
-- AWS Systems Manager (Session Manager)
-- AWS IAM (Roles, Policies, Instance Profiles)
-- Amazon CloudWatch (Logs/Monitoring)
+- **Amazon VPC** - Custom virtual private cloud with public/private subnets
+- **Amazon EC2** - Web servers hosting WordPress application
+- **Application Load Balancer (ALB)** - Distributes traffic across multiple EC2 instances
+- **Amazon RDS** - Multi-AZ MySQL database for WordPress data
+- **Auto Scaling Group** - Automatically scales EC2 instances based on demand
+- **Security Groups** - Instance-level firewall rules
+- **Internet Gateway** - Provides internet access to public subnets
+- **NAT Gateway** - Enables internet access for private subnet resources
+- **Route 53** (Optional) - DNS management for custom domain
 
 ## 3. Difficulty
 Intermediate
 
 ## 4. Architecture Diagram
+
 ```mermaid
-graph TD
-  A[Internet Users] -->|HTTP/HTTPS| B[(Application Load Balancer)]
-  subgraph VPC [Custom VPC]
-    direction LR
-    subgraph PublicAZ1 [Public Subnet AZ1]
-      B
+graph TB
+    Internet([Internet])
+    IGW[Internet Gateway]
+    
+    subgraph "VPC - 10.0.0.0/16"
+        subgraph "Availability Zone A"
+            PubSubA[Public Subnet A<br/>10.0.1.0/24]
+            PrivSubA[Private Subnet A<br/>10.0.3.0/24]
+            NATGWA[NAT Gateway A]
+        end
+        
+        subgraph "Availability Zone B"
+            PubSubB[Public Subnet B<br/>10.0.2.0/24]
+            PrivSubB[Private Subnet B<br/>10.0.4.0/24]
+            NATGWB[NAT Gateway B]
+        end
+        
+        ALB[Application Load Balancer]
+        
+        subgraph "Auto Scaling Group"
+            EC2A[WordPress EC2 A]
+            EC2B[WordPress EC2 B]
+        end
+        
+        subgraph "RDS Subnet Group"
+            RDSPrimary[(RDS Primary<br/>AZ-A)]
+            RDSStandby[(RDS Standby<br/>AZ-B)]
+        end
     end
-    subgraph PublicAZ2 [Public Subnet AZ2]
-      B
-    end
-
-    subgraph PrivateAZ1 [Private Subnet AZ1]
-      C1[EC2 - Web Server 1]
-    end
-    subgraph PrivateAZ2 [Private Subnet AZ2]
-      C2[EC2 - Web Server 2]
-    end
-
-    C1 <-->|MySQL 3306| D[(RDS MySQL - Multi-AZ)]
-    C2 <-->|MySQL 3306| D
-  end
-
-  E[NAT Gateway x2] --- C1
-  E --- C2
+    
+    Internet --> IGW
+    IGW --> ALB
+    ALB --> EC2A
+    ALB --> EC2B
+    EC2A --> RDSPrimary
+    EC2B --> RDSPrimary
+    RDSPrimary -.-> RDSStandby
+    
+    PubSubA --> NATGWA
+    PubSubB --> NATGWB
+    NATGWA --> PrivSubA
+    NATGWB --> PrivSubB
+    
+    EC2A -.-> PrivSubA
+    EC2B -.-> PrivSubB
 ```
 
 ## 5. Prerequisites
-- AWS account with billing enabled and a user with AdministratorAccess (for the lab only).
-- Basic familiarity with web apps is helpful but not required.
 - Ensure you have completed the initial setup detailed in the main [PREREQUISITES.md](../PREREQUISITES.md) file in the repository root.
+- Basic understanding of networking concepts (subnets, routing, firewalls)
+- Familiarity with Linux command line and WordPress basics
 
 ## 6. Step-by-Step Guide
-Follow these numbered steps exactly. Console labels may vary slightly by Region; these steps reflect the AWS Console as of late 2025.
 
-1) VPC and Networking Setup
-1. Navigate to the **VPC** service. In the left navigation, click **Your VPCs**.
-2. Click **Create VPC**.
-3. For **Resources to create**, choose **VPC and more**.
-4. In **Name tag auto-generation**, enter `wp4`.
-5. For **IPv4 CIDR block**, enter `10.0.0.0/16`.
-6. For **Number of Availability Zones**, choose **2**.
-7. For **Number of public subnets**, choose **2**.
-8. For **Number of private subnets**, choose **2**.
-9. For **NAT gateways ($)**, select **1 per AZ** (recommended for HA; costs apply). For low cost demo, you may choose **None** but outbound internet from private subnets will break.
-10. For **VPC endpoints**, leave default.
-11. Click **Create VPC** and wait until status shows **Complete**. Note the created resource names (e.g., `wp4-vpc`, `wp4-public-az1`, `wp4-private-az1`, route tables, IGW, NAT, etc.).
+### Phase 1: VPC and Networking Setup
 
-2) Database Layer (DB Subnet Group + RDS MySQL Multi-AZ)
-1. Go to **RDS** > **Subnet groups** (left menu under **Network & security**).
-2. Click **Create DB subnet group**.
-3. Name: `wp4-db-subnet-group` | Description: `DB subnets for WordPress` | VPC: select `wp4-vpc`.
-4. For **Availability Zones**, select the two AZs used by the VPC wizard.
-5. For **Subnets**, select the two private subnets (one in each AZ). Click **Create**.
-6. In **Databases**, click **Create database**.
-7. Choose **Standard create**.
-8. **Engine options**: Select **MySQL**.
-9. **Version**: choose the latest MySQL 8.0 compatible.
-10. **Templates**: choose **Production** (enables Multi-AZ). Ensure **Multi-AZ DB instance** is checked. If instead using the newer **Multi-AZ DB cluster**, you can choose that too; this guide assumes Multi-AZ instance for simplicity.
-11. **Settings**:
-   - DB instance identifier: `wp4-mysql`
-   - Master username: `wpadmin`
-   - Master password: enter a strong password, e.g. `Wp4-Admin-StrongP@ssw0rd!` and confirm.
-12. **Instance configuration**:
-   - DB instance class: choose a burstable class, e.g., `db.t3.micro` or `db.t4g.micro` (ARM requires Graviton-compatible clients; x86 is fine).
-13. **Storage**:
-   - Storage type: **gp3**
-   - Allocated: **20 GiB**
-   - Disable storage autoscaling (optional for cost).
-14. **Availability & durability**: Ensure **Multi-AZ** is enabled.
-15. **Connectivity**:
-   - VPC: select `wp4-vpc`
-   - Compute resource: leave default.
-   - DB subnet group: select `wp4-db-subnet-group`
-   - Public access: **No**
-   - VPC security group: select an existing SG or click **Create new** placeholder; we will attach the DB SG later. For now choose **Create new** and name it `wp4-db-sg` allowing no inbound (we will edit soon).
-   - Availability Zone: No preference.
-16. **Database authentication**: Password authentication.
-17. **Additional configuration**:
-   - Initial database name: `wordpress`
-   - DB parameter group: default
-   - Backup: keep defaults (7 days). For cost savings, reduce as desired.
-   - Monitoring/Log exports: optional.
-18. Click **Create database**. Wait until status is **Available**. Note the **Endpoint** (e.g., `wp4-mysql.xxxxx.us-east-1.rds.amazonaws.com`) and **Port 3306**.
+#### Step 1: Create Custom VPC
+1. Navigate to **VPC Dashboard** in AWS Console
+2. Click **Create VPC**
+3. Select **VPC and more** (recommended for beginners)
+4. Configure:
+   - **Name tag auto-generation**: `wordpress-vpc`
+   - **IPv4 CIDR block**: `10.0.0.0/16`
+   - **Number of Availability Zones**: `2`
+   - **Number of public subnets**: `2`
+   - **Number of private subnets**: `2`
+   - **NAT gateways**: `In 1 AZ` (for cost optimization)
+   - **VPC endpoints**: `None`
+5. Click **Create VPC**
 
-3) Application Layer Security (Security Groups)
-1. Go to **EC2** > **Security Groups**.
-2. Click **Create security group**. Create three SGs in the same VPC `wp4-vpc`:
-   - ALB SG: Name `wp4-alb-sg`. Inbound rules:
-     - Type: **HTTP** Port `80` Source: `0.0.0.0/0` and `::/0`
-     - Optional: **HTTPS** Port `443` Source: `0.0.0.0/0` and `::/0` (if you plan to add an ACM cert; otherwise skip)
-     Outbound: default allow all.
-   - Web SG: Name `wp4-web-sg`. Inbound rules:
-     - Type: **HTTP** Port `80` Source: `wp4-alb-sg` (choose **Custom** then select the SG ID)
-     - Optional: **HTTPS** Port `443` Source: `wp4-alb-sg`
-     - Optional for SSM Agent updates: **HTTPS (443)** Source: `0.0.0.0/0` (not needed if NAT provides egress)
-     Outbound: allow all (needed for package installs via NAT).
-   - DB SG: Name `wp4-db-sg` (edit existing if created by RDS). Inbound rules:
-     - Type: **MySQL/Aurora** Port `3306` Source: `wp4-web-sg` (select by SG ID)
-     Outbound: default.
+**Alternative Manual Setup (if you want more control):**
+- Create VPC with CIDR `10.0.0.0/16`
+- Create 4 subnets:
+  - Public Subnet A: `10.0.1.0/24` (us-east-1a)
+  - Public Subnet B: `10.0.2.0/24` (us-east-1b)
+  - Private Subnet A: `10.0.3.0/24` (us-east-1a)
+  - Private Subnet B: `10.0.4.0/24` (us-east-1b)
+- Create and attach Internet Gateway
+- Create NAT Gateway in Public Subnet A
+- Configure route tables appropriately
 
-4) IAM Role for SSM
-1. Go to **IAM** > **Roles** > **Create role**.
-2. **Trusted entity type**: **AWS service**. Use case: **EC2**.
-3. Click **Next** to permissions.
-4. Search and check **AmazonSSMManagedInstanceCore**.
-5. Optional: Click **Create policy**, switch to **JSON**, paste contents of `assets/iam_ssm_policy.json`, name `wp4-ssm-inline`, create, and attach instead. Using the AWS managed policy is recommended.
-6. Click **Next** to name.
-7. Role name: `wp4-ec2-ssm-role`. Create role.
-8. Go to **IAM** > **Instance profiles** and confirm an instance profile with the same name exists; if not, create instance profile and add the role.
+### Phase 2: Database Setup
 
-5) Launch Template
-1. Go to **EC2** > **Launch Templates** > **Create launch template**.
-2. Launch template name: `wp4-launch-template`.
-3. Source template: None.
-4. Amazon Machine Image (AMI): Choose the latest **Amazon Linux 2 AMI (HVM), SSD Volume Type**.
-5. Instance type: `t2.micro` or `t3.micro`.
-6. Key pair: **Do not include** (we'll use SSM Session Manager; no SSH needed).
-7. Network settings: Leave unset here (will be chosen by the ASG).
-8. Security groups: Select `wp4-web-sg`.
-9. Storage: Keep default 8 GiB gp3, or set 16 GiB if desired.
-10. Resource tags: Add `Name=wp4-web`.
-11. Advanced details:
-    - IAM instance profile: select `wp4-ec2-ssm-role`.
-    - User data: open `assets/user_data.sh` and paste its entire content here. Then replace the placeholders with your actual DB details or pass env vars via the script header. For example set:
-      - `WORDPRESS_DB_NAME=wordpress`
-      - `WORDPRESS_DB_USER=wpadmin` (or a dedicated app user you create on the DB)
-      - `WORDPRESS_DB_PASSWORD=<your RDS master/admin password or app user password>`
-      - `WORDPRESS_DB_HOST=<your RDS endpoint>`
-    - To pass env values inline, put them before the script body, e.g.:
-```
-#!/bin/bash
-WORDPRESS_DB_NAME=wordpress
-WORDPRESS_DB_USER=wpadmin
-WORDPRESS_DB_PASSWORD=YourStrongPass
-WORDPRESS_DB_HOST=wp4-mysql.xxxxxx.us-east-1.rds.amazonaws.com
-# paste the rest of user_data.sh here
-```
-12. Create launch template.
+#### Step 2: Create RDS Subnet Group
+1. Navigate to **RDS Dashboard**
+2. Go to **Subnet groups** → **Create DB subnet group**
+3. Configure:
+   - **Name**: `wordpress-db-subnet-group`
+   - **Description**: `Subnet group for WordPress RDS`
+   - **VPC**: Select your `wordpress-vpc`
+   - **Availability Zones**: Select both AZs (us-east-1a, us-east-1b)
+   - **Subnets**: Select both private subnets
+4. Click **Create**
 
-6) Auto Scaling Group
-1. Go to **EC2** > **Auto Scaling Groups** > **Create Auto Scaling group**.
-2. Name: `wp4-asg`.
-3. Choose launch template: select `wp4-launch-template`. Click **Next**.
-4. Network: VPC `wp4-vpc`.
-5. Subnets: Select the two private subnets (one in each AZ).
-6. Load balancing: Choose **Attach to an existing load balancer later** for now (we'll attach via target group), or select **Attach to a new load balancer** and choose **Application Load Balancer**. For clarity, choose later and continue.
-7. Health checks: **EC2** (or **ELB** once ALB is attached). Health check grace period: `300` seconds.
-8. Desired capacity: `2` | Minimum: `2` | Maximum: `4`.
-9. Scaling policies: None for now (manual). Click **Next** through notifications/tags as desired, then **Create Auto Scaling group**.
+#### Step 3: Create RDS Database
+1. In RDS Dashboard, click **Create database**
+2. Configure:
+   - **Database creation method**: `Standard create`
+   - **Engine**: `MySQL`
+   - **Version**: `8.0.35` (or latest)
+   - **Templates**: `Free tier` (if eligible) or `Production`
+   - **DB instance identifier**: `wordpress-db`
+   - **Master username**: `admin`
+   - **Master password**: Use password from `assets/db-config.txt`
+   - **DB instance class**: `db.t3.micro` (Free tier) or `db.t3.small`
+   - **Storage type**: `General Purpose SSD (gp2)`
+   - **Allocated storage**: `20 GB`
+   - **Enable storage autoscaling**: ✓
+   - **Multi-AZ deployment**: ✓ (Enable for fault tolerance)
+   - **VPC**: `wordpress-vpc`
+   - **DB Subnet group**: `wordpress-db-subnet-group`
+   - **Public access**: `No`
+   - **VPC security group**: Create new → `wordpress-db-sg`
+   - **Database port**: `3306`
+   - **Initial database name**: `wordpress`
+3. Click **Create database**
 
-7) Load Balancer (ALB + Target Group)
-1. Go to **EC2** > **Target Groups** > **Create target group**.
-2. Target type: **Instances** (or **IP** if preferred). Name: `wp4-tg`.
-3. Protocol: **HTTP** Port `80`. VPC: `wp4-vpc`.
-4. Health checks: Path `/health.html`. Healthy threshold `2`, Unhealthy threshold `2`, Timeout `5`, Interval `30`.
-5. Click **Next** and do not register targets yet (the ASG will register automatically). Click **Create target group**.
-6. Go to **EC2** > **Load Balancers** > **Create load balancer** > **Application Load Balancer**.
-7. Name: `wp4-alb`. Scheme: **Internet-facing**. IP address type: **IPv4**.
-8. Network mapping: Select the two public subnets created by the VPC wizard (one per AZ).
-9. Security groups: Select `wp4-alb-sg`.
-10. Listeners and routing: Listener **HTTP:80**. Default action: **Forward to** `wp4-tg`.
-11. Click **Create load balancer** and wait for status **Active**.
-12. Attach ASG to Target Group: Go to **Auto Scaling Groups** > open `wp4-asg` > **Automatic scaling** > **Load balancing** > **Edit** > check **Attach to a load balancer** and select `wp4-tg`. Save. Alternatively, in the target group, register the instances once they show up.
+### Phase 3: Security Groups Setup
 
-8) Testing
-1. In **EC2** > **Load Balancers**, open `wp4-alb`. Copy the **DNS name** (e.g., `wp4-alb-123456.us-east-1.elb.amazonaws.com`).
-2. Open the DNS name in your browser. You should see the WordPress setup page.
-3. Complete the setup by entering:
-   - Site Title: any
-   - Username: `admin`
-   - Password: a strong password
-   - Email: your email
-4. Log in to confirm the site works. Try stopping one instance or one AZ; traffic should continue via ALB and the ASG should replace instances.
+#### Step 4: Create Security Groups
+Create the following security groups in your VPC:
+
+**ALB Security Group (`wordpress-alb-sg`):**
+- Inbound: HTTP (80) from 0.0.0.0/0
+- Inbound: HTTPS (443) from 0.0.0.0/0
+- Outbound: All traffic
+
+**Web Server Security Group (`wordpress-web-sg`):**
+- Inbound: HTTP (80) from ALB Security Group
+- Inbound: SSH (22) from your IP (for management)
+- Outbound: All traffic
+
+**Database Security Group (`wordpress-db-sg`):**
+- Inbound: MySQL/Aurora (3306) from Web Server Security Group
+- Outbound: All traffic
+
+### Phase 4: Launch Template and Auto Scaling
+
+#### Step 5: Create Launch Template
+1. Navigate to **EC2 Dashboard** → **Launch Templates**
+2. Click **Create launch template**
+3. Configure:
+   - **Template name**: `wordpress-launch-template`
+   - **Template version description**: `WordPress server template v1`
+   - **AMI**: `Amazon Linux 2023 AMI`
+   - **Instance type**: `t3.micro` (Free tier eligible)
+   - **Key pair**: Select your existing key pair
+   - **Security groups**: `wordpress-web-sg`
+   - **Advanced details** → **User data**: Paste content from `assets/wordpress-userdata.sh`
+4. Click **Create launch template**
+
+#### Step 6: Create Auto Scaling Group
+1. Navigate to **Auto Scaling** → **Auto Scaling Groups**
+2. Click **Create Auto Scaling group**
+3. Configure:
+   - **Name**: `wordpress-asg`
+   - **Launch template**: `wordpress-launch-template`
+   - **VPC**: `wordpress-vpc`
+   - **Subnets**: Select both private subnets
+   - **Load balancing**: `Attach to a new load balancer`
+   - **Load balancer type**: `Application Load Balancer`
+   - **Load balancer name**: `wordpress-alb`
+   - **Load balancer scheme**: `Internet-facing`
+   - **Target group name**: `wordpress-targets`
+   - **Health check type**: `ELB`
+   - **Health check grace period**: `300 seconds`
+   - **Group size**:
+     - Desired: `2`
+     - Minimum: `1`
+     - Maximum: `4`
+   - **Scaling policies**: `Target tracking scaling policy`
+     - Metric: `Average CPU utilization`
+     - Target value: `70`
+4. Click **Create Auto Scaling group**
+
+### Phase 7: Application Load Balancer Configuration
+
+#### Step 7: Configure ALB (if not done via Auto Scaling)
+If you need to manually configure the ALB:
+1. Navigate to **EC2** → **Load Balancers**
+2. Find your `wordpress-alb` and click on it
+3. Update security group to `wordpress-alb-sg`
+4. Configure health check:
+   - **Health check path**: `/wp-admin/install.php`
+   - **Healthy threshold**: `2`
+   - **Interval**: `30 seconds`
+
+### Phase 8: WordPress Configuration
+
+#### Step 8: Access WordPress Setup
+1. Wait for Auto Scaling Group to launch instances (5-10 minutes)
+2. Check ALB target group health in EC2 console
+3. Once targets are healthy, copy ALB DNS name
+4. Open browser and navigate to ALB DNS name
+5. Complete WordPress installation:
+   - **Database Name**: `wordpress`
+   - **Username**: `admin`
+   - **Password**: From `assets/db-config.txt`
+   - **Database Host**: RDS endpoint from RDS console
+   - **Table Prefix**: `wp_`
+
+#### Step 9: Test Fault Tolerance
+1. **Test Auto Scaling**: Create CPU load on one instance
+2. **Test Multi-AZ**: Simulate database failover in RDS console
+3. **Test Load Balancing**: Stop one EC2 instance and verify traffic routes to healthy instance
+
+### Phase 9: Optional Enhancements
+
+#### Step 10: Configure CloudWatch Monitoring
+1. Set up CloudWatch alarms for:
+   - EC2 CPU utilization
+   - ALB target health
+   - RDS connections
+   - RDS CPU utilization
+
+#### Step 11: Enable HTTPS (Optional)
+1. Request SSL certificate via AWS Certificate Manager
+2. Add HTTPS listener to ALB
+3. Configure redirect from HTTP to HTTPS
 
 ## 7. Learning Materials & Key Concepts
-- Concept 1: High Availability vs. Fault Tolerance: This design spreads resources across AZs (ALB subnets, ASG subnets) and uses RDS Multi-AZ for automatic failover. ALB + ASG provide availability, while Multi-AZ improves fault tolerance at the database layer.
-- Concept 2: Stateful vs. Stateless Application Tiers: EC2 web servers are stateless; they serve PHP code and fetch state from RDS. If an instance is terminated, no user data is lost because state persists in the DB. WordPress media can be offloaded to S3 for full statelessness.
-- Concept 3: VPC Networking and Security: Public subnets host internet-facing ALB and NAT gateways. Private subnets host EC2 and RDS without public IPs. Security Groups are stateful and only allow necessary flows (ALB->Web 80/443, Web->DB 3306).
-- Concept 4: Scalability & Elasticity: ALB distributes traffic and monitors health. ASG scales instance count based on demand or health, replacing unhealthy nodes automatically.
+
+### High Availability Architecture
+This project implements several AWS Well-Architected Framework principles:
+
+**Multi-AZ Deployment:**
+- RDS Multi-AZ provides automatic failover in case of database instance failure
+- Application Load Balancer distributes traffic across multiple Availability Zones
+- Auto Scaling Group ensures instances are distributed across AZs
+
+**Fault Tolerance:**
+- RDS Multi-AZ maintains a standby replica for automatic failover
+- ALB performs health checks and routes traffic only to healthy instances
+- Auto Scaling replaces failed instances automatically
+
+**Scalability:**
+- Auto Scaling Group adjusts capacity based on CPU utilization
+- ALB can handle varying loads without manual intervention
+- RDS can scale storage automatically when needed
+
+**Security Best Practices:**
+- Private subnets isolate database and application tiers
+- Security groups implement principle of least privilege
+- NAT Gateway provides controlled internet access for private resources
+
+### Key SAA-C03 Exam Topics Covered:
+- **VPC Design**: Multi-tier architecture with public/private subnets
+- **Load Balancing**: Application Load Balancer vs Network Load Balancer
+- **Auto Scaling**: Scaling policies and health checks
+- **RDS Multi-AZ**: Database high availability and failover
+- **Security Groups vs NACLs**: Layer 4 vs Layer 3 security
+- **NAT Gateway vs NAT Instance**: Managed vs self-managed solutions
+
+### Cost Optimization Considerations:
+- Single NAT Gateway instead of per-AZ (trade-off: reduced availability)
+- t3.micro instances for cost efficiency
+- GP2 storage for RDS (vs more expensive io1/io2)
+- Auto Scaling helps avoid over-provisioning
 
 ## 8. Cost & Free Tier Eligibility
-- Free Tier: EC2 t2.micro/t3.micro may be eligible under Free Tier hours. However, RDS Multi-AZ and NAT Gateways are NOT free tier eligible. ALB has hourly and LCU charges. Data transfer within same AZ may incur charges.
-- Potential Costs: Primary costs come from RDS Multi-AZ instance hours and NAT Gateways (per-hour + data). ALB hourly cost also applies. To minimize cost, do the lab in the smallest region pricing and delete resources immediately after testing.
+
+### Free Tier Eligible Services:
+- **EC2**: 750 hours of t2.micro or t3.micro instances per month
+- **RDS**: 750 hours of db.t2.micro or db.t3.micro instances per month
+- **Application Load Balancer**: 750 hours per month
+- **Data Transfer**: 1 GB per month
+
+### **⚠️ Charges Will Apply For:**
+- **RDS Multi-AZ**: Doubles the cost as you pay for both primary and standby instances
+- **NAT Gateway**: $0.045/hour + data processing charges (~$32/month if left running)
+- **Elastic IP**: If you allocate but don't use it ($0.005/hour)
+- **Data Transfer**: Beyond free tier limits
+
+### Estimated Monthly Costs (US East 1):
+- **EC2 instances (2 x t3.micro)**: Free tier or ~$16/month
+- **RDS Multi-AZ (db.t3.micro)**: ~$25/month (no free tier for Multi-AZ)
+- **ALB**: Free tier or ~$20/month
+- **NAT Gateway**: ~$32/month + data processing
+- **EBS Storage**: ~$2/month for 20GB
+- **Total**: ~$60-80/month if running continuously
+
+**💡 Cost Savings Tips:**
+- Stop/start resources when not in use
+- Use db.t3.micro for development (can upgrade for production)
+- Consider single-AZ RDS for development environments
+- Delete NAT Gateway when not needed (impacts private subnet internet access)
 
 ## 9. Cleanup Instructions
-Follow this order to avoid dependency errors and stop all charges:
-1. Delete Application Load Balancer: **EC2** > **Load Balancers** > select `wp4-alb` > **Actions** > **Delete**.
-2. Delete Auto Scaling Group: **EC2** > **Auto Scaling Groups** > select `wp4-asg` > **Delete**. Confirm. Wait for instance termination.
-3. Delete Launch Template: **EC2** > **Launch Templates** > select `wp4-launch-template` > **Actions** > **Delete template**.
-4. Delete RDS Database: **RDS** > **Databases** > select `wp4-mysql` > **Actions** > **Delete** > uncheck **Create final snapshot** and check **I acknowledge** > **Delete**.
-5. Release Elastic IP: **VPC** > **Elastic IP addresses** > select EIP used by NAT Gateways > **Actions** > **Release**.
-6. Delete NAT Gateway: **VPC** > **NAT Gateways** > select gateway(s) > **Actions** > **Delete**.
-7. Delete Internet Gateway: **VPC** > **Internet Gateways** > select the IGW attached to `wp4-vpc` > **Actions** > **Detach from VPC** > then **Delete**.
-8. Delete VPC: **VPC** > **Your VPCs** > select `wp4-vpc` > **Actions** > **Delete VPC** (this also deletes subnets and route tables).
+
+⚠️ **Important**: Follow this order to avoid dependency issues and ensure complete resource deletion.
+
+### Step 1: Auto Scaling and Load Balancer Cleanup
+```bash
+# Scale down Auto Scaling Group first
+1. Navigate to Auto Scaling Groups
+2. Select wordpress-asg
+3. Edit → Set Desired, Min, Max to 0
+4. Wait for instances to terminate
+5. Delete Auto Scaling Group
+6. Delete Launch Template
+```
+
+### Step 2: Load Balancer Cleanup
+```bash
+1. Navigate to EC2 → Load Balancers
+2. Select wordpress-alb
+3. Actions → Delete
+4. Navigate to Target Groups
+5. Select wordpress-targets
+6. Actions → Delete
+```
+
+### Step 3: RDS Cleanup
+```bash
+1. Navigate to RDS → Databases
+2. Select wordpress-db
+3. Actions → Delete
+4. Uncheck "Create final snapshot" (for lab purposes)
+5. Type "delete me" to confirm
+6. Delete DB Subnet Group: wordpress-db-subnet-group
+```
+
+### Step 4: VPC and Networking Cleanup
+```bash
+1. Navigate to VPC Dashboard
+2. Delete in this order:
+   a. NAT Gateways (Release Elastic IPs when prompted)
+   b. Internet Gateway (Detach first, then delete)
+   c. Route Tables (except main route table)
+   d. Security Groups (except default)
+   e. Subnets
+   f. VPC
+```
+
+### Step 5: Verify Cleanup
+```bash
+1. Check EC2 → Instances (should show "terminated")
+2. Check RDS → Databases (should be empty)
+3. Check VPC → Your VPCs (should only show default VPC)
+4. Check Billing → Cost Explorer for any ongoing charges
+```
+
+### Emergency Cleanup Script
+If you encounter dependency issues, use the AWS CLI cleanup script in `assets/cleanup.sh`.
 
 ## 10. Associated Project Files
-- `assets/user_data.sh` – EC2 User Data script to install Apache/PHP, download and configure WordPress, and connect to RDS.
-- `assets/iam_ssm_policy.json` – IAM policy enabling SSM Session Manager connectivity for EC2 (alternative to opening SSH).
+
+The `assets` folder contains the following helper files:
+
+### Configuration Files:
+- **`db-config.txt`** - Database connection details and secure password
+- **`wordpress-userdata.sh`** - EC2 user data script for WordPress installation
+- **`security-groups.json`** - Security group rules in JSON format
+
+### Helper Scripts:
+- **`setup-vpc.sh`** - Automated VPC creation script (alternative to console)
+- **`cleanup.sh`** - Emergency cleanup script for all resources
+- **`test-connectivity.sh`** - Script to test database connectivity from EC2
+
+### IAM Policies:
+- **`ec2-role-policy.json`** - IAM policy for EC2 instances (if using IAM roles)
+- **`cloudwatch-policy.json`** - CloudWatch monitoring permissions
+
+### Monitoring:
+- **`cloudwatch-alarms.json`** - CloudWatch alarm configurations
+- **`health-check.sh`** - Custom health check script for instances
+
+These files simplify the deployment process and provide automation options for advanced users while maintaining the hands-on learning experience through the AWS Console.
+
+---
+
+## Troubleshooting Tips
+
+### Common Issues:
+1. **WordPress can't connect to database**: Check security group rules and RDS endpoint
+2. **ALB returns 502 errors**: Verify target group health and security groups
+3. **Instances not joining target group**: Check user data script execution in EC2 logs
+4. **High costs**: Ensure you're using free tier eligible instance types
+
+### Useful Commands:
+```bash
+# Check WordPress installation logs
+sudo tail -f /var/log/cloud-init-output.log
+
+# Test database connectivity
+mysql -h [RDS_ENDPOINT] -u admin -p wordpress
+
+# Check Apache status
+sudo systemctl status httpd
+```
+
+**Remember**: This project demonstrates production-ready architecture patterns, so some components (like RDS Multi-AZ) incur costs beyond the free tier. Always clean up resources promptly to minimize charges!

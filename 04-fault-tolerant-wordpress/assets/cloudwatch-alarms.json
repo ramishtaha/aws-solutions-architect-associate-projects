@@ -1,0 +1,201 @@
+{
+  "CloudWatchAlarms": [
+    {
+      "AlarmName": "WordPress-High-CPU-Utilization",
+      "AlarmDescription": "Triggers when EC2 instances have high CPU utilization",
+      "MetricName": "CPUUtilization",
+      "Namespace": "AWS/EC2",
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 2,
+      "Threshold": 80,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "Dimensions": [
+        {
+          "Name": "AutoScalingGroupName",
+          "Value": "wordpress-asg"
+        }
+      ],
+      "AlarmActions": [
+        "arn:aws:sns:us-east-1:ACCOUNT-ID:wordpress-alerts"
+      ],
+      "TreatMissingData": "notBreaching"
+    },
+    {
+      "AlarmName": "WordPress-ALB-Target-Response-Time",
+      "AlarmDescription": "Triggers when ALB target response time is high",
+      "MetricName": "TargetResponseTime",
+      "Namespace": "AWS/ApplicationELB",
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 2,
+      "Threshold": 1,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "Dimensions": [
+        {
+          "Name": "LoadBalancer",
+          "Value": "app/wordpress-alb/LOAD-BALANCER-ID"
+        }
+      ],
+      "AlarmActions": [
+        "arn:aws:sns:us-east-1:ACCOUNT-ID:wordpress-alerts"
+      ],
+      "TreatMissingData": "notBreaching"
+    },
+    {
+      "AlarmName": "WordPress-ALB-Unhealthy-Targets",
+      "AlarmDescription": "Triggers when ALB has unhealthy targets",
+      "MetricName": "UnHealthyHostCount",
+      "Namespace": "AWS/ApplicationELB",
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 1,
+      "Threshold": 0,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "Dimensions": [
+        {
+          "Name": "TargetGroup",
+          "Value": "targetgroup/wordpress-targets/TARGET-GROUP-ID"
+        },
+        {
+          "Name": "LoadBalancer",
+          "Value": "app/wordpress-alb/LOAD-BALANCER-ID"
+        }
+      ],
+      "AlarmActions": [
+        "arn:aws:sns:us-east-1:ACCOUNT-ID:wordpress-alerts"
+      ],
+      "TreatMissingData": "notBreaching"
+    },
+    {
+      "AlarmName": "WordPress-RDS-High-CPU",
+      "AlarmDescription": "Triggers when RDS CPU utilization is high",
+      "MetricName": "CPUUtilization",
+      "Namespace": "AWS/RDS",
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 2,
+      "Threshold": 80,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "Dimensions": [
+        {
+          "Name": "DBInstanceIdentifier",
+          "Value": "wordpress-db"
+        }
+      ],
+      "AlarmActions": [
+        "arn:aws:sns:us-east-1:ACCOUNT-ID:wordpress-alerts"
+      ],
+      "TreatMissingData": "notBreaching"
+    },
+    {
+      "AlarmName": "WordPress-RDS-High-Connections",
+      "AlarmDescription": "Triggers when RDS has too many connections",
+      "MetricName": "DatabaseConnections",
+      "Namespace": "AWS/RDS",
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 2,
+      "Threshold": 80,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "Dimensions": [
+        {
+          "Name": "DBInstanceIdentifier",
+          "Value": "wordpress-db"
+        }
+      ],
+      "AlarmActions": [
+        "arn:aws:sns:us-east-1:ACCOUNT-ID:wordpress-alerts"
+      ],
+      "TreatMissingData": "notBreaching"
+    },
+    {
+      "AlarmName": "WordPress-RDS-Low-Free-Storage",
+      "AlarmDescription": "Triggers when RDS free storage space is low",
+      "MetricName": "FreeStorageSpace",
+      "Namespace": "AWS/RDS",
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 1,
+      "Threshold": 2000000000,
+      "ComparisonOperator": "LessThanThreshold",
+      "Dimensions": [
+        {
+          "Name": "DBInstanceIdentifier",
+          "Value": "wordpress-db"
+        }
+      ],
+      "AlarmActions": [
+        "arn:aws:sns:us-east-1:ACCOUNT-ID:wordpress-alerts"
+      ],
+      "TreatMissingData": "notBreaching"
+    },
+    {
+      "AlarmName": "WordPress-ALB-5XX-Errors",
+      "AlarmDescription": "Triggers when ALB returns too many 5XX errors",
+      "MetricName": "HTTPCode_ELB_5XX_Count",
+      "Namespace": "AWS/ApplicationELB",
+      "Statistic": "Sum",
+      "Period": 300,
+      "EvaluationPeriods": 2,
+      "Threshold": 10,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "Dimensions": [
+        {
+          "Name": "LoadBalancer",
+          "Value": "app/wordpress-alb/LOAD-BALANCER-ID"
+        }
+      ],
+      "AlarmActions": [
+        "arn:aws:sns:us-east-1:ACCOUNT-ID:wordpress-alerts"
+      ],
+      "TreatMissingData": "notBreaching"
+    },
+    {
+      "AlarmName": "WordPress-Auto-Scaling-Group-Min-Size",
+      "AlarmDescription": "Triggers when Auto Scaling Group has fewer instances than desired",
+      "MetricName": "GroupInServiceInstances",
+      "Namespace": "AWS/AutoScaling",
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 1,
+      "Threshold": 1,
+      "ComparisonOperator": "LessThanThreshold",
+      "Dimensions": [
+        {
+          "Name": "AutoScalingGroupName",
+          "Value": "wordpress-asg"
+        }
+      ],
+      "AlarmActions": [
+        "arn:aws:sns:us-east-1:ACCOUNT-ID:wordpress-alerts"
+      ],
+      "TreatMissingData": "breaching"
+    }
+  ],
+  "Instructions": [
+    "Replace ACCOUNT-ID with your actual AWS account ID",
+    "Replace LOAD-BALANCER-ID with your actual ALB identifier",
+    "Replace TARGET-GROUP-ID with your actual target group identifier",
+    "Create SNS topic 'wordpress-alerts' before setting up alarms",
+    "Subscribe to the SNS topic to receive alarm notifications",
+    "Adjust thresholds based on your specific requirements",
+    "Some alarms may need to be created after resources are deployed"
+  ],
+  "SNSTopicCreation": {
+    "TopicName": "wordpress-alerts",
+    "Description": "Notifications for WordPress infrastructure alerts",
+    "Subscription": {
+      "Protocol": "email",
+      "Endpoint": "your-email@example.com"
+    }
+  },
+  "UsageNotes": [
+    "CPU thresholds are set conservatively at 80% for learning purposes",
+    "Production environments may require different thresholds",
+    "Response time threshold of 1 second may be too aggressive for some applications",
+    "Free storage space alarm is set to 2GB (2000000000 bytes)",
+    "5XX error threshold of 10 errors in 5 minutes indicates application issues",
+    "Monitor these alarms regularly and adjust based on normal traffic patterns"
+  ]
+}

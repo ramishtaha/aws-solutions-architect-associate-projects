@@ -1,0 +1,101 @@
+{
+  "SecurityGroups": [
+    {
+      "GroupName": "wordpress-alb-sg",
+      "Description": "Security group for WordPress Application Load Balancer",
+      "VpcId": "vpc-xxxxxxxxx",
+      "SecurityGroupRules": [
+        {
+          "IpPermissions": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 80,
+              "ToPort": 80,
+              "IpRanges": [
+                {
+                  "CidrIp": "0.0.0.0/0",
+                  "Description": "HTTP access from anywhere"
+                }
+              ]
+            },
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 443,
+              "ToPort": 443,
+              "IpRanges": [
+                {
+                  "CidrIp": "0.0.0.0/0",
+                  "Description": "HTTPS access from anywhere"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "GroupName": "wordpress-web-sg",
+      "Description": "Security group for WordPress web servers",
+      "VpcId": "vpc-xxxxxxxxx",
+      "SecurityGroupRules": [
+        {
+          "IpPermissions": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 80,
+              "ToPort": 80,
+              "UserIdGroupPairs": [
+                {
+                  "GroupId": "sg-xxxxxxxxx",
+                  "Description": "HTTP from ALB security group"
+                }
+              ]
+            },
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 22,
+              "ToPort": 22,
+              "IpRanges": [
+                {
+                  "CidrIp": "YOUR_IP_ADDRESS/32",
+                  "Description": "SSH access from your IP only"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "GroupName": "wordpress-db-sg",
+      "Description": "Security group for WordPress RDS database",
+      "VpcId": "vpc-xxxxxxxxx",
+      "SecurityGroupRules": [
+        {
+          "IpPermissions": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 3306,
+              "ToPort": 3306,
+              "UserIdGroupPairs": [
+                {
+                  "GroupId": "sg-xxxxxxxxx",
+                  "Description": "MySQL access from web servers"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "Notes": [
+    "Replace 'vpc-xxxxxxxxx' with your actual VPC ID",
+    "Replace 'sg-xxxxxxxxx' with actual security group IDs after creation",
+    "Replace 'YOUR_IP_ADDRESS' with your actual public IP address",
+    "These rules implement the principle of least privilege",
+    "Web servers only accept HTTP traffic from ALB",
+    "Database only accepts MySQL traffic from web servers",
+    "SSH access is restricted to your IP address only"
+  ]
+}
