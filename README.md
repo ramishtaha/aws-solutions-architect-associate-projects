@@ -26,7 +26,7 @@ Each project is designed to be:
 | 03 | Decouple an Application with SQS and Lambda | SQS, Lambda, CloudWatch, IAM | Beginner | Implement message queuing for application decoupling and asynchronous processing |
 | 04 | Deploy a Fault-Tolerant WordPress Site | EC2, ALB, RDS, VPC, Auto Scaling | Intermediate | Build a scalable, highly available web application with load balancing and database redundancy |
 | 05 | Build a Secure Three-Tier Network Architecture | VPC, Subnets, NAT Gateway, Bastion Host, Security Groups, NACLs | Intermediate | Design and implement a secure network foundation with proper tier isolation |
-| 06 | Automate Infrastructure with CloudFormation | CloudFormation, EC2, VPC, RDS | Intermediate | Learn Infrastructure as Code principles by automating the deployment from Project 5 |
+| 06 | Automate a VPC Deployment with AWS CloudFormation | CloudFormation, VPC, EC2, IAM | Intermediate | Learn Infrastructure as Code principles by automating the three-tier network deployment from Project 5 |
 | 07 | Implement Cross-Region Disaster Recovery | S3 Cross-Region Replication, RDS Cross-Region Snapshots, Route 53 Health Checks | Intermediate | Design and implement disaster recovery strategies for business continuity |
 | 08 | Create a Data Processing Pipeline | S3 Event Notifications, Lambda, Kinesis Data Firehose, CloudWatch | Advanced | Build an event-driven data processing workflow for analytics |
 | 09 | Deploy Containerized Application with ECS Fargate | ECS, Fargate, ECR, Application Load Balancer, CloudWatch | Advanced | Learn container orchestration and serverless container deployment |

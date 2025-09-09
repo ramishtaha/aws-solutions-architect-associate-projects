@@ -1,0 +1,881 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Three-tier VPC architecture with web and application servers - Infrastructure as Code demonstration for AWS SAA-C03 preparation'
+
+# =============================================================================
+# PARAMETERS - Input values for template customization
+# =============================================================================
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    Description: EC2 instance type for web and application servers
+    ConstraintDescription: Must be a valid EC2 instance type (t2.micro recommended for Free Tier)
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair to enable SSH access to instances
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair
+
+  Environment:
+    Type: String
+    Default: Development
+    AllowedValues:
+      - Development
+      - Staging
+      - Production
+    Description: Environment name for resource tagging and identification
+
+# =============================================================================
+# MAPPINGS - Static lookup tables for region-specific values
+# =============================================================================
+Mappings:
+  # Latest Amazon Linux 2 AMI IDs by region (as of September 2025)
+  RegionMap:
+    us-east-1:
+      AMI: ami-0abcdef1234567890  # Amazon Linux 2 AMI
+    us-west-1:
+      AMI: ami-0123456789abcdef0  # Amazon Linux 2 AMI
+    us-west-2:
+      AMI: ami-0fedcba0987654321  # Amazon Linux 2 AMI
+    eu-west-1:
+      AMI: ami-0987654321fedcba0  # Amazon Linux 2 AMI
+    ap-southeast-1:
+      AMI: ami-0456789012345678a  # Amazon Linux 2 AMI
+
+  # Environment-specific configuration
+  EnvironmentMap:
+    Development:
+      InstanceCount: 2
+    Staging:
+      InstanceCount: 2
+    Production:
+      InstanceCount: 4
+
+# =============================================================================
+# RESOURCES - AWS components to create
+# =============================================================================
+Resources:
+
+  # -------------------------------------------------------------------------
+  # VPC AND NETWORKING FOUNDATION
+  # -------------------------------------------------------------------------
+  
+  # Main VPC - Virtual Private Cloud for network isolation
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-Three-Tier-VPC'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: 'CloudFormation-IaC-Demo'
+
+  # Internet Gateway - Provides internet access to public subnets
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-IGW'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Attach Internet Gateway to VPC
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # -------------------------------------------------------------------------
+  # PUBLIC SUBNETS (Web Tier)
+  # -------------------------------------------------------------------------
+
+  # Public Subnet 1 - Availability Zone A
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-Public-Subnet-1'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Web'
+
+  # Public Subnet 2 - Availability Zone B
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-Public-Subnet-2'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Web'
+
+  # Public Subnet 3 - Availability Zone C (for NAT Gateway)
+  PublicSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [2, !GetAZs '']
+      CidrBlock: 10.0.3.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-Public-Subnet-3-NAT'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'NAT'
+
+  # -------------------------------------------------------------------------
+  # PRIVATE SUBNETS (Application Tier)
+  # -------------------------------------------------------------------------
+
+  # Private Subnet 1 - Availability Zone A
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.4.0/24
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-Private-Subnet-1'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Application'
+
+  # Private Subnet 2 - Availability Zone B
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.0.5.0/24
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-Private-Subnet-2'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Application'
+
+  # Private Subnet 3 - Availability Zone C
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [2, !GetAZs '']
+      CidrBlock: 10.0.6.0/24
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-Private-Subnet-3'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Application'
+
+  # -------------------------------------------------------------------------
+  # NAT GATEWAY FOR PRIVATE SUBNET INTERNET ACCESS
+  # -------------------------------------------------------------------------
+
+  # Elastic IP for NAT Gateway
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-NAT-Gateway-EIP'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # NAT Gateway - Enables outbound internet access for private subnets
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref PublicSubnet3
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-NAT-Gateway'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -------------------------------------------------------------------------
+  # ROUTE TABLES AND ROUTING
+  # -------------------------------------------------------------------------
+
+  # Public Route Table - Routes traffic to Internet Gateway
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-Public-Route-Table'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Default public route - Route all traffic (0.0.0.0/0) to Internet Gateway
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # Associate public subnets with public route table
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  PublicSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet3
+
+  # Private Route Table - Routes traffic to NAT Gateway
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-Private-Route-Table'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Default private route - Route all traffic (0.0.0.0/0) to NAT Gateway
+  DefaultPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  # Associate private subnets with private route table
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet2
+
+  PrivateSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet3
+
+  # -------------------------------------------------------------------------
+  # SECURITY GROUPS (Virtual Firewalls)
+  # -------------------------------------------------------------------------
+
+  # Web Security Group - Allows HTTP, HTTPS, and SSH access
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-Web-Security-Group'
+      GroupDescription: Security group for web servers - allows HTTP, HTTPS, and SSH
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        # HTTP access from anywhere
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: 'HTTP access from internet'
+        # HTTPS access from anywhere
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: 'HTTPS access from internet'
+        # SSH access from anywhere (restrict this in production)
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+          Description: 'SSH access for management'
+      SecurityGroupEgress:
+        # Allow all outbound traffic
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: 'All outbound traffic'
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-Web-Security-Group'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Application Security Group - Allows access only from web tier
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-App-Security-Group'
+      GroupDescription: Security group for application servers - allows access from web tier only
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        # HTTP access from web security group only
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref WebSecurityGroup
+          Description: 'HTTP access from web tier'
+        # Custom application port (example: 8080)
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref WebSecurityGroup
+          Description: 'Application port access from web tier'
+        # SSH access from web security group for management
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref WebSecurityGroup
+          Description: 'SSH access from web tier for management'
+      SecurityGroupEgress:
+        # Allow all outbound traffic (for package updates, API calls, etc.)
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: 'All outbound traffic'
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-App-Security-Group'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -------------------------------------------------------------------------
+  # IAM ROLE FOR EC2 INSTANCES
+  # -------------------------------------------------------------------------
+
+  # IAM Role for EC2 instances - allows CloudWatch monitoring and SSM access
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-EC2-Role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-EC2-Role'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Instance Profile for EC2 role
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub '${Environment}-EC2-Instance-Profile'
+      Roles:
+        - !Ref EC2Role
+
+  # -------------------------------------------------------------------------
+  # EC2 INSTANCES - WEB TIER
+  # -------------------------------------------------------------------------
+
+  # Web Server 1 - In Public Subnet 1
+  WebServer1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          SubnetId: !Ref PublicSubnet1
+          GroupSet:
+            - !Ref WebSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y nginx
+          systemctl start nginx
+          systemctl enable nginx
+          
+          # Create a custom index page
+          cat > /var/www/html/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Web Server 1 - ${Environment}</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }
+                  .container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                  .header { color: #232f3e; border-bottom: 2px solid #ff9900; padding-bottom: 10px; }
+                  .info { margin: 20px 0; }
+                  .highlight { background-color: #fff3cd; padding: 10px; border-radius: 4px; margin: 10px 0; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1 class="header">🚀 CloudFormation Deployment Successful!</h1>
+                  <div class="info">
+                      <h2>Web Server 1 Details</h2>
+                      <p><strong>Environment:</strong> ${Environment}</p>
+                      <p><strong>Instance Type:</strong> ${InstanceType}</p>
+                      <p><strong>Availability Zone:</strong> $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)</p>
+                      <p><strong>Instance ID:</strong> $(curl -s http://169.254.169.254/latest/meta-data/instance-id)</p>
+                      <p><strong>Private IP:</strong> $(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)</p>
+                      <p><strong>Public IP:</strong> $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)</p>
+                  </div>
+                  <div class="highlight">
+                      <p><strong>✅ Infrastructure as Code Success!</strong></p>
+                      <p>This entire three-tier architecture was deployed using a single CloudFormation template.</p>
+                  </div>
+              </div>
+          </body>
+          </html>
+          EOF
+          
+          # Set proper permissions
+          chmod 644 /var/www/html/index.html
+          chown nginx:nginx /var/www/html/index.html
+          
+          # Restart nginx to ensure it's running
+          systemctl restart nginx
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-Web-Server-1'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Web'
+        - Key: Server
+          Value: 'WebServer1'
+
+  # Web Server 2 - In Public Subnet 2
+  WebServer2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          SubnetId: !Ref PublicSubnet2
+          GroupSet:
+            - !Ref WebSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y nginx
+          systemctl start nginx
+          systemctl enable nginx
+          
+          # Create a custom index page
+          cat > /var/www/html/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Web Server 2 - ${Environment}</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }
+                  .container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                  .header { color: #232f3e; border-bottom: 2px solid #ff9900; padding-bottom: 10px; }
+                  .info { margin: 20px 0; }
+                  .highlight { background-color: #d4edda; padding: 10px; border-radius: 4px; margin: 10px 0; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1 class="header">🚀 CloudFormation Deployment Successful!</h1>
+                  <div class="info">
+                      <h2>Web Server 2 Details</h2>
+                      <p><strong>Environment:</strong> ${Environment}</p>
+                      <p><strong>Instance Type:</strong> ${InstanceType}</p>
+                      <p><strong>Availability Zone:</strong> $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)</p>
+                      <p><strong>Instance ID:</strong> $(curl -s http://169.254.169.254/latest/meta-data/instance-id)</p>
+                      <p><strong>Private IP:</strong> $(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)</p>
+                      <p><strong>Public IP:</strong> $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)</p>
+                  </div>
+                  <div class="highlight">
+                      <p><strong>✅ Multi-AZ Deployment!</strong></p>
+                      <p>This server is in a different Availability Zone for high availability.</p>
+                  </div>
+              </div>
+          </body>
+          </html>
+          EOF
+          
+          # Set proper permissions
+          chmod 644 /var/www/html/index.html
+          chown nginx:nginx /var/www/html/index.html
+          
+          # Restart nginx to ensure it's running
+          systemctl restart nginx
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-Web-Server-2'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Web'
+        - Key: Server
+          Value: 'WebServer2'
+
+  # -------------------------------------------------------------------------
+  # EC2 INSTANCES - APPLICATION TIER
+  # -------------------------------------------------------------------------
+
+  # Application Server 1 - In Private Subnet 1
+  AppServer1:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SubnetId: !Ref PrivateSubnet1
+      SecurityGroupIds:
+        - !Ref AppSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y python3 python3-pip
+          
+          # Create a simple application server on port 8080
+          cat > /home/ec2-user/app.py << 'EOF'
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          import json
+          import urllib.request
+          
+          class AppHandler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  self.send_response(200)
+                  self.send_header('Content-type', 'application/json')
+                  self.end_headers()
+                  
+                  # Get instance metadata
+                  try:
+                      instance_id = urllib.request.urlopen('http://169.254.169.254/latest/meta-data/instance-id', timeout=2).read().decode()
+                      az = urllib.request.urlopen('http://169.254.169.254/latest/meta-data/placement/availability-zone', timeout=2).read().decode()
+                      private_ip = urllib.request.urlopen('http://169.254.169.254/latest/meta-data/local-ipv4', timeout=2).read().decode()
+                  except:
+                      instance_id = "unknown"
+                      az = "unknown"
+                      private_ip = "unknown"
+                  
+                  response = {
+                      "message": "Application Server 1 - ${Environment}",
+                      "status": "healthy",
+                      "instance_id": instance_id,
+                      "availability_zone": az,
+                      "private_ip": private_ip,
+                      "tier": "Application"
+                  }
+                  
+                  self.wfile.write(json.dumps(response, indent=2).encode())
+          
+          if __name__ == '__main__':
+              server = HTTPServer(('0.0.0.0', 8080), AppHandler)
+              print("Application server starting on port 8080...")
+              server.serve_forever()
+          EOF
+          
+          # Create systemd service for the app
+          cat > /etc/systemd/system/myapp.service << 'EOF'
+          [Unit]
+          Description=Simple Application Server
+          After=network.target
+          
+          [Service]
+          Type=simple
+          User=ec2-user
+          ExecStart=/usr/bin/python3 /home/ec2-user/app.py
+          Restart=always
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+          # Start the application service
+          systemctl daemon-reload
+          systemctl enable myapp
+          systemctl start myapp
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-App-Server-1'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Application'
+        - Key: Server
+          Value: 'AppServer1'
+
+  # Application Server 2 - In Private Subnet 2
+  AppServer2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SubnetId: !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref AppSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y python3 python3-pip
+          
+          # Create a simple application server on port 8080
+          cat > /home/ec2-user/app.py << 'EOF'
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          import json
+          import urllib.request
+          
+          class AppHandler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  self.send_response(200)
+                  self.send_header('Content-type', 'application/json')
+                  self.end_headers()
+                  
+                  # Get instance metadata
+                  try:
+                      instance_id = urllib.request.urlopen('http://169.254.169.254/latest/meta-data/instance-id', timeout=2).read().decode()
+                      az = urllib.request.urlopen('http://169.254.169.254/latest/meta-data/placement/availability-zone', timeout=2).read().decode()
+                      private_ip = urllib.request.urlopen('http://169.254.169.254/latest/meta-data/local-ipv4', timeout=2).read().decode()
+                  except:
+                      instance_id = "unknown"
+                      az = "unknown"
+                      private_ip = "unknown"
+                  
+                  response = {
+                      "message": "Application Server 2 - ${Environment}",
+                      "status": "healthy",
+                      "instance_id": instance_id,
+                      "availability_zone": az,
+                      "private_ip": private_ip,
+                      "tier": "Application"
+                  }
+                  
+                  self.wfile.write(json.dumps(response, indent=2).encode())
+          
+          if __name__ == '__main__':
+              server = HTTPServer(('0.0.0.0', 8080), AppHandler)
+              print("Application server starting on port 8080...")
+              server.serve_forever()
+          EOF
+          
+          # Create systemd service for the app
+          cat > /etc/systemd/system/myapp.service << 'EOF'
+          [Unit]
+          Description=Simple Application Server
+          After=network.target
+          
+          [Service]
+          Type=simple
+          User=ec2-user
+          ExecStart=/usr/bin/python3 /home/ec2-user/app.py
+          Restart=always
+          
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+          # Start the application service
+          systemctl daemon-reload
+          systemctl enable myapp
+          systemctl start myapp
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-App-Server-2'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Application'
+        - Key: Server
+          Value: 'AppServer2'
+
+# =============================================================================
+# OUTPUTS - Values returned after stack creation
+# =============================================================================
+Outputs:
+
+  # VPC Information
+  VPCId:
+    Description: ID of the created VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub '${Environment}-VPC-ID'
+
+  VPCCidr:
+    Description: CIDR block of the VPC
+    Value: !GetAtt VPC.CidrBlock
+    Export:
+      Name: !Sub '${Environment}-VPC-CIDR'
+
+  # Public Subnet IDs
+  PublicSubnet1Id:
+    Description: ID of Public Subnet 1
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub '${Environment}-Public-Subnet-1-ID'
+
+  PublicSubnet2Id:
+    Description: ID of Public Subnet 2
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub '${Environment}-Public-Subnet-2-ID'
+
+  PublicSubnet3Id:
+    Description: ID of Public Subnet 3 (NAT)
+    Value: !Ref PublicSubnet3
+    Export:
+      Name: !Sub '${Environment}-Public-Subnet-3-ID'
+
+  # Private Subnet IDs
+  PrivateSubnet1Id:
+    Description: ID of Private Subnet 1
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub '${Environment}-Private-Subnet-1-ID'
+
+  PrivateSubnet2Id:
+    Description: ID of Private Subnet 2
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: !Sub '${Environment}-Private-Subnet-2-ID'
+
+  PrivateSubnet3Id:
+    Description: ID of Private Subnet 3
+    Value: !Ref PrivateSubnet3
+    Export:
+      Name: !Sub '${Environment}-Private-Subnet-3-ID'
+
+  # Security Group IDs
+  WebSecurityGroupId:
+    Description: ID of the Web Security Group
+    Value: !Ref WebSecurityGroup
+    Export:
+      Name: !Sub '${Environment}-Web-Security-Group-ID'
+
+  AppSecurityGroupId:
+    Description: ID of the Application Security Group
+    Value: !Ref AppSecurityGroup
+    Export:
+      Name: !Sub '${Environment}-App-Security-Group-ID'
+
+  # NAT Gateway Information
+  NatGatewayId:
+    Description: ID of the NAT Gateway
+    Value: !Ref NatGateway
+    Export:
+      Name: !Sub '${Environment}-NAT-Gateway-ID'
+
+  NatGatewayEIP:
+    Description: Elastic IP of the NAT Gateway
+    Value: !Ref NatGatewayEIP
+    Export:
+      Name: !Sub '${Environment}-NAT-Gateway-EIP'
+
+  # Web Server Information
+  WebServer1PublicIP:
+    Description: Public IP address of Web Server 1
+    Value: !GetAtt WebServer1.PublicIp
+
+  WebServer1PrivateIP:
+    Description: Private IP address of Web Server 1
+    Value: !GetAtt WebServer1.PrivateIp
+
+  WebServer2PublicIP:
+    Description: Public IP address of Web Server 2
+    Value: !GetAtt WebServer2.PublicIp
+
+  WebServer2PrivateIP:
+    Description: Private IP address of Web Server 2
+    Value: !GetAtt WebServer2.PrivateIp
+
+  # Application Server Information
+  AppServer1PrivateIP:
+    Description: Private IP address of Application Server 1
+    Value: !GetAtt AppServer1.PrivateIp
+
+  AppServer2PrivateIP:
+    Description: Private IP address of Application Server 2
+    Value: !GetAtt AppServer2.PrivateIp
+
+  # Access Information
+  WebServer1URL:
+    Description: URL to access Web Server 1
+    Value: !Sub 'http://${WebServer1.PublicIp}'
+
+  WebServer2URL:
+    Description: URL to access Web Server 2
+    Value: !Sub 'http://${WebServer2.PublicIp}'
+
+  # Stack Information
+  StackName:
+    Description: Name of this CloudFormation stack
+    Value: !Ref 'AWS::StackName'
+
+  Environment:
+    Description: Environment name for this deployment
+    Value: !Ref Environment
+
+  # Quick Access Information
+  QuickAccessInfo:
+    Description: Quick access information for testing
+    Value: !Sub |
+      🌐 Web Server 1: http://${WebServer1.PublicIp}
+      🌐 Web Server 2: http://${WebServer2.PublicIp}
+      🔧 SSH to Web Server 1: ssh -i your-key.pem ec2-user@${WebServer1.PublicIp}
+      🔧 SSH to Web Server 2: ssh -i your-key.pem ec2-user@${WebServer2.PublicIp}
+      📊 Environment: ${Environment}
+      🏗️ Stack: ${AWS::StackName}
