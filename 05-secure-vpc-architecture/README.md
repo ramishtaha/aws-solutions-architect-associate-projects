@@ -28,30 +28,30 @@ Intermediate
 
 ```mermaid
 graph TB
-    subgraph "AWS Cloud"
-        subgraph "Custom VPC (10.0.0.0/16)"
-            subgraph "Availability Zone A"
-                subgraph "Public Subnet A (10.0.1.0/24)"
+    subgraph AWS["AWS Cloud"]
+        subgraph VPC["Custom VPC (10.0.0.0/16)"]
+            subgraph AZA["Availability Zone A"]
+                subgraph PubA["Public Subnet A (10.0.1.0/24)"]
                     IGW[Internet Gateway]
                     WEB1[Web Server<br/>Nginx]
                     NAT[NAT Gateway]
                 end
-                subgraph "Private App Subnet A (10.0.3.0/24)"
+                subgraph AppA["Private App Subnet A (10.0.3.0/24)"]
                     APP1[App Server]
                 end
-                subgraph "Private DB Subnet A (10.0.5.0/24)"
+                subgraph DBA["Private DB Subnet A (10.0.5.0/24)"]
                     DB1[Database Tier<br/>Simulated]
                 end
             end
             
-            subgraph "Availability Zone B"
-                subgraph "Public Subnet B (10.0.2.0/24)"
+            subgraph AZB["Availability Zone B"]
+                subgraph PubB["Public Subnet B (10.0.2.0/24)"]
                     BASTION[Bastion Host]
                 end
-                subgraph "Private App Subnet B (10.0.4.0/24)"
+                subgraph AppB["Private App Subnet B (10.0.4.0/24)"]
                     APP2[App Server<br/>Standby]
                 end
-                subgraph "Private DB Subnet B (10.0.6.0/24)"
+                subgraph DBB["Private DB Subnet B (10.0.6.0/24)"]
                     DB2[Database Tier<br/>Simulated]
                 end
             end
@@ -64,12 +64,12 @@ graph TB
     APP1 -.-> NAT
     NAT --> IGW
     
-    classDef publicSubnet fill:#e1f5fe
-    classDef privateSubnet fill:#f3e5f5
-    classDef instance fill:#fff3e0
+    classDef publicSubnet fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef privateSubnet fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef instance fill:#fff3e0,stroke:#e65100,stroke-width:2px
     
-    class "Public Subnet A","Public Subnet B" publicSubnet
-    class "Private App Subnet A","Private App Subnet B","Private DB Subnet A","Private DB Subnet B" privateSubnet
+    class PubA,PubB publicSubnet
+    class AppA,AppB,DBA,DBB privateSubnet
     class WEB1,BASTION,APP1,APP2,DB1,DB2 instance
 ```
 
