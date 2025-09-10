@@ -3,7 +3,7 @@
 
 # Stage 1: Build stage
 # Use the official Python runtime as the base image
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # Set the working directory in the container
 WORKDIR /app
