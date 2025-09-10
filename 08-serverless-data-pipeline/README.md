@@ -193,7 +193,7 @@ graph TD
    - In the "Code source" section, you'll see a code editor with default code
    - Select all the default code (Ctrl+A) and delete it
    - Copy the contents of `transform-lambda.py` from the assets folder and paste it
-   - **Important**: Update line 13 with your actual Firehose stream name:
+   - **Important**: Update line 17 with your actual Firehose stream name:
      ```python
      FIREHOSE_STREAM_NAME = 'data-transformation-stream'
      ```
@@ -306,22 +306,64 @@ graph TD
 - Lambda's IAM execution role lacks required permissions
 - Incorrect Firehose stream name in the Lambda code
 - CSV file format issues or empty file
+- Firehose stream and Lambda function are in different regions
 
 **Solutions:**
 1. **Check CloudWatch Logs (FIRST STEP):**
    - Lambda console → Monitor → View CloudWatch logs
    - Look for error messages like "AccessDenied", "ResourceNotFound", or Python exceptions
 
-2. **Verify IAM Role Permissions:**
+2. **Fix "Firehose not found" Error:**
+   - **Error**: `ResourceNotFoundException: Firehose not found under account XXXX`
+   - **Cause**: Stream name mismatch or different regions
+   - **Solution**:
+     - Go to Kinesis Data Firehose console and copy the exact stream name
+     - Update line 17 in your Lambda function code with the correct name:
+       ```python
+       FIREHOSE_STREAM_NAME = 'your-actual-stream-name'
+       ```
+     - **CRITICAL**: Ensure both Lambda and Firehose are in the same AWS region
+     - Click "Deploy" in Lambda after making changes
+
+3. **Fix Region Mismatch (If Lambda and Firehose are in different regions):**
+   
+   **Option A: Move Lambda to Firehose Region (Recommended)**
+   1. Note your current Lambda function code and configuration
+   2. Switch to the AWS region where your Firehose stream is located (top-right corner)
+   3. Create a new Lambda function in that region:
+      - Use the same name: `csv-to-json-transformer`
+      - Use the same IAM role: `LambdaDataProcessingRole` (if it exists in that region)
+      - Copy the same function code
+   4. Delete the old Lambda function from the wrong region
+   5. Update S3 event notification to point to the new Lambda function
+
+   **Option B: Move Firehose to Lambda Region**
+   1. Note your current Firehose configuration (destination bucket, buffer settings, etc.)
+   2. Switch to the AWS region where your Lambda function is located
+   3. Create a new Firehose stream in that region with the same configuration
+   4. Delete the old Firehose stream from the wrong region
+   5. Update your S3 destination bucket region if needed
+
+   **Option C: Move Everything to the Same Region (Cleanest)**
+   1. Choose one region for all resources (e.g., us-east-1 or eu-west-1)
+   2. Recreate all resources in that region:
+      - S3 buckets
+      - Kinesis Data Firehose stream
+      - Lambda function
+      - IAM role (if needed)
+   3. This ensures consistency and avoids future region-related issues
+
+3. **Verify IAM Role Permissions:**
    - IAM console → Roles → LambdaDataProcessingRole
    - Check attached policies include:
      - `AWSLambdaBasicExecutionRole`
      - Custom policy with `s3:GetObject` and `firehose:PutRecord` permissions
    - Ensure S3 resource ARN matches your bucket name exactly
 
-3. **Validate Configuration:**
+4. **Validate Configuration:**
    - Check that `FIREHOSE_STREAM_NAME` in Lambda code matches your actual stream name
    - Verify the CSV file has content and proper formatting
+   - Confirm both resources are in the same AWS region
 
 ### Problem 3: The Lambda function executes successfully, but no data appears in the destination S3 bucket
 
