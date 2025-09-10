@@ -311,9 +311,86 @@ graph TB
    - Refresh the page multiple times to see load balancing between tasks
    - Test the health endpoint by adding `/health` to the URL
 
+### 🚨 **IMMEDIATE TROUBLESHOOTING - If ALB DNS times out:**
+
+**Step A: Check Target Health Status**
+1. Go to EC2 console → Target Groups → `flask-fargate-targets` → "Targets" tab
+2. If targets show "unhealthy":
+   - Note the "Status details" column for error messages
+   - Common causes: Connection refused, timeout, wrong health check path
+
+**Step B: Verify Security Group Configuration**
+1. **ALB Security Group:**
+   - EC2 console → Load Balancers → Select your ALB → "Security" tab
+   - Must have: HTTP (80) inbound from 0.0.0.0/0
+   
+2. **ECS Service Security Group:**
+   - ECS console → Your service → "Networking" tab → Note security group
+   - EC2 console → Security Groups → Select that security group
+   - Must have: Custom TCP (8080) inbound from ALB's security group
+
+**Step C: Quick Security Group Fix**
+If security groups are wrong:
+1. EC2 console → Security Groups → Select ECS service security group
+2. "Inbound rules" tab → "Edit inbound rules"
+3. Add rule: Type=Custom TCP, Port=8080, Source=ALB security group
+4. Save rules
+5. Wait 2-3 minutes and test ALB DNS again
+
 ## 7. Troubleshooting Common Issues
 
-### Problem 1: Docker push command to ECR fails with "no basic auth credentials"
+### Problem 1: Load Balancer DNS times out with "ERR_CONNECTION_TIMED_OUT"
+
+**Symptoms:**
+- Browser shows "This site can't be reached" 
+- Error message: "took too long to respond" or "ERR_CONNECTION_TIMED_OUT"
+- ALB DNS name is not accessible
+
+**Step-by-Step Diagnosis:**
+
+1. **Check ALB Security Group:**
+   - Go to EC2 console → Load Balancers
+   - Select your `flask-fargate-alb`
+   - Click the "Security" tab
+   - Verify the security group allows **inbound HTTP (port 80) from 0.0.0.0/0**
+   - If missing, click "Edit security groups" and add this rule
+
+2. **Check Target Group Health:**
+   - Go to EC2 console → Target Groups
+   - Select `flask-fargate-targets`
+   - Click the "Targets" tab
+   - **If targets show "unhealthy"** (most common cause):
+     - Check if ECS service security group allows inbound port 8080 from ALB security group
+     - Verify health check path is set to `/health` (not `/`)
+     - Check if tasks are actually running in ECS console
+
+3. **Verify ECS Service Security Group:**
+   - Go to ECS console → Clusters → `flask-fargate-cluster` → Services → `flask-fargate-service`
+   - Click the "Networking" tab
+   - Note the security group ID(s)
+   - Go to EC2 console → Security Groups
+   - Select the ECS service security group
+   - **Critical:** Ensure inbound rule allows:
+     - **Type:** Custom TCP
+     - **Port:** 8080
+     - **Source:** The ALB's security group (not 0.0.0.0/0)
+
+4. **Check Task Status:**
+   - In ECS console, go to your service
+   - Click "Tasks" tab
+   - Ensure both tasks show "RUNNING" status
+   - If tasks keep stopping/starting, check CloudWatch logs
+
+**Quick Fix for Security Group Issues:**
+```
+ALB Security Group Inbound Rules:
+- HTTP (80) from 0.0.0.0/0
+
+ECS Service Security Group Inbound Rules:
+- Custom TCP (8080) from ALB Security Group
+```
+
+### Problem 2: Docker push command to ECR fails with "no basic auth credentials"
 
 **Potential Causes:**
 - The AWS CLI to Docker login command was not run
