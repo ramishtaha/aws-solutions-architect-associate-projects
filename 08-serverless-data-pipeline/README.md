@@ -113,23 +113,14 @@ graph TD
 #### Create IAM Role
 
 1. **Navigate to IAM Console:**
-   - Search for "IAM" and click on the IAM service
-   - Click "Roles" in the left sidebar
+   - In the AWS Console search bar, type "IAM" and click on "Identity and Access Management (IAM)"
+   - In the left navigation panel, click "Roles"
 
-2. **Create Role:**
-   - Click "Create role"
-   - Trusted entity type: "AWS service"
-   - Use case: "Lambda"
-   - Click "Next"
-
-3. **Attach Policies:**
-   - Search for and select "AWSLambdaBasicExecutionRole"
-   - Click "Next"
-
-4. **Create Custom Policy:**
-   - Click "Create policy" (opens in new tab)
-   - Click "JSON" tab
-   - Replace the content with:
+2. **Create Custom Policy First:**
+   - In the left navigation panel, click "Policies"
+   - Click the "Create policy" button (blue button on the right)
+   - Click the "JSON" tab (not Visual editor)
+   - Delete all existing content and paste:
    ```json
    {
        "Version": "2012-10-17",
@@ -152,44 +143,70 @@ graph TD
        ]
    }
    ```
-   - Replace `yourname-raw-data-bucket-*` with your actual source bucket name pattern
-   - Click "Next: Tags", then "Next: Review"
-   - Policy name: `LambdaDataProcessingPolicy`
-   - Click "Create policy"
+   - **Important**: Replace `yourname-raw-data-bucket-*` with your actual source bucket name pattern
+   - Click "Next" button
+   - **Policy name**: Enter `LambdaDataProcessingPolicy`
+   - **Description**: "Allows Lambda to read from S3 and write to Kinesis Firehose"
+   - Click "Create policy" button
 
-5. **Complete Role Creation:**
-   - Go back to the role creation tab
-   - Refresh the policies list
-   - Search for and select "LambdaDataProcessingPolicy"
-   - Click "Next"
-   - Role name: `LambdaDataProcessingRole`
-   - Click "Create role"
+3. **Create the IAM Role:**
+   - In the left navigation panel, click "Roles"
+   - Click the "Create role" button (blue button on the right)
+   - **Trusted entity type**: Select "AWS service" (should be selected by default)
+   - **Service or use case**: Scroll down and select "Lambda" from the list
+   - Click "Next" button
+
+4. **Attach Permissions Policies:**
+   - In the search box, type "AWSLambdaBasicExecutionRole"
+   - Check the box next to "AWSLambdaBasicExecutionRole" policy
+   - In the search box, clear the previous search and type "LambdaDataProcessingPolicy"
+   - Check the box next to "LambdaDataProcessingPolicy" (the custom policy you just created)
+   - You should now have both policies selected:
+     - ✅ AWSLambdaBasicExecutionRole
+     - ✅ LambdaDataProcessingPolicy
+   - Click "Next" button
+
+5. **Name and Create the Role:**
+   - **Role name**: Enter `LambdaDataProcessingRole`
+   - **Description**: "Execution role for CSV to JSON transformer Lambda function"
+   - Click "Create role" button
 
 #### Create Lambda Function
 
 1. **Navigate to Lambda Console:**
-   - Search for "Lambda" and click on the service
+   - In the AWS Console search bar, type "Lambda" and click on "AWS Lambda"
 
 2. **Create Function:**
-   - Click "Create function"
-   - Choose "Author from scratch"
-   - Function name: `csv-to-json-transformer`
-   - Runtime: "Python 3.12"
-   - Execution role: "Use an existing role"
-   - Existing role: Select "LambdaDataProcessingRole"
-   - Click "Create function"
+   - Click "Create function" button (orange button on the right)
+   - Ensure "Author from scratch" is selected (default)
+   - **Function name**: `csv-to-json-transformer`
+   - **Runtime**: Select "Python 3.12" from the dropdown
+   - **Architecture**: Leave as "x86_64" (default)
 
-3. **Upload Function Code:**
-   - In the function code editor, replace the default code with the contents of `transform-lambda.py` from the assets folder
-   - Update the `FIREHOSE_STREAM_NAME` variable with your actual stream name: `data-transformation-stream`
-   - Click "Deploy"
+3. **Configure Execution Role:**
+   - Expand "Change default execution role" section
+   - Select "Use an existing role"
+   - **Existing role**: Choose "LambdaDataProcessingRole" from the dropdown
+   - Click "Create function" button
 
-4. **Configure Function Settings:**
-   - Go to "Configuration" tab → "General configuration"
-   - Click "Edit"
-   - Timeout: 1 minute
-   - Memory: 128 MB (default is sufficient)
-   - Click "Save"
+4. **Upload Function Code:**
+   - In the "Code source" section, you'll see a code editor with default code
+   - Select all the default code (Ctrl+A) and delete it
+   - Copy the contents of `transform-lambda.py` from the assets folder and paste it
+   - **Important**: Update line 13 with your actual Firehose stream name:
+     ```python
+     FIREHOSE_STREAM_NAME = 'data-transformation-stream'
+     ```
+   - Click "Deploy" button (orange button above the code editor)
+
+5. **Configure Function Settings:**
+   - Click the "Configuration" tab (next to "Code")
+   - In the left sidebar under Configuration, click "General configuration"
+   - Click the "Edit" button
+   - **Timeout**: Change from 3 seconds to "1 min 0 sec"
+   - **Memory**: Leave as 128 MB (sufficient for this project)
+   - **Description**: "Transforms CSV files to JSON and sends to Kinesis Firehose"
+   - Click "Save" button
 
 ### Step 4: Configure S3 Trigger
 
