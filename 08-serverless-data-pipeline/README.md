@@ -68,24 +68,25 @@ graph TD
 
 ### Step 2: Create Kinesis Data Firehose Stream
 
-1. **Navigate to Kinesis Console:**
-   - Search for "Kinesis" in the AWS Console
-   - Click on "Amazon Kinesis"
+1. **Navigate to Kinesis Data Firehose Console:**
+   - Search for "Kinesis Data Firehose" in the AWS Console (not just "Kinesis")
+   - Click on "Amazon Kinesis Data Firehose" from the search results
+   - **Alternative**: Search for "Kinesis" → Click "Amazon Kinesis" → Click "Kinesis Data Firehose" in the left sidebar
 
 2. **Create Delivery Stream:**
-   - Click "Create delivery stream"
-   - Choose "Kinesis Data Firehose"
-   - Click "Create delivery stream"
+   - Click "Create Firehose stream" (the orange button on the right)
+   - This will start the delivery stream creation wizard
 
-3. **Configure Source:**
-   - Source: Select "Direct PUT or other sources"
-   - Delivery stream name: `data-transformation-stream`
+3. **Configure Source and Destination:**
+   - **Choose source**: Select "Direct PUT" (this means your Lambda function will send data directly)
+   - **Choose destination**: Select "Amazon S3"
+   - **Firehose stream name**: `data-transformation-stream`
 
-4. **Configure Destination:**
-   - Destination: Select "Amazon S3"
-   - S3 bucket: Choose your `yourname-processed-data-bucket`
-   - S3 prefix: `processed-data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/`
-   - S3 error prefix: `errors/`
+4. **Configure S3 Destination:**
+   - **S3 bucket**: Choose your `yourname-processed-data-bucket` from the dropdown
+   - **Dynamic partitioning**: Leave disabled for this project
+   - **S3 bucket prefix**: `processed-data/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/`
+   - **S3 bucket error output prefix**: `errors/`
 
 5. **Configure Buffer Settings:**
    - Buffer size: 1 MB (minimum for testing)
