@@ -89,16 +89,23 @@ graph TD
    - **S3 bucket error output prefix**: `errors/`
 
 5. **Configure Buffer Settings:**
-   - Buffer size: 1 MB (minimum for testing)
-   - Buffer interval: 60 seconds
-   - Compression: GZIP (optional but recommended)
+   - **Buffer size**: 1 MB (minimum for testing)
+   - **Buffer interval**: 60 seconds
+   - **Compression**: GZIP (optional but recommended)
 
-6. **Configure Error Handling:**
-   - Error record handling: Leave as default
+6. **Configure Permissions (IMPORTANT):**
+   - **Service access**: Choose "Create or update IAM role"
+   - **IAM role**: The console will suggest a role name like `KinesisFirehoseServiceRole-data-transfor-[region]-[timestamp]`
+   - **Allow AWS to create this role** - Make sure this option is selected
+   - The role will be automatically created with the necessary permissions to write to your S3 bucket
 
-7. **Review and Create:**
+7. **Advanced Settings (Optional):**
+   - **Error record handling**: Leave as default
+   - **Logging**: Enable CloudWatch logging (recommended for troubleshooting)
+
+8. **Review and Create:**
    - Review all settings
-   - Click "Create delivery stream"
+   - Click "Create Firehose stream"
    - Wait for the stream to become "Active" (this may take a few minutes)
 
 ### Step 3: Create IAM Role and Lambda Function
@@ -227,6 +234,32 @@ graph TD
    - Download and examine the processed file (should be in JSON format)
 
 ## 7. Troubleshooting Common Issues
+
+### Problem 0: Firehose creation fails with "unable to assume role" error
+
+**Error Message**: "Firehose is unable to assume role arn:aws:iam::XXXX:role/service-role/KinesisFirehoseServiceRole-... Please check the role provided."
+
+**Potential Causes:**
+- IAM role creation failed or was not properly configured during Firehose setup
+- Insufficient permissions to create IAM roles
+- Role exists but has incorrect trust policy or permissions
+
+**Solutions:**
+1. **Use Automatic Role Creation (Recommended):**
+   - During Firehose creation, select "Create or update IAM role"
+   - Let AWS automatically create the role with correct permissions
+   - Ensure your AWS user has IAM permissions to create roles
+
+2. **Manual Role Creation (If automatic fails):**
+   - Go to IAM Console → Roles → Create role
+   - Trusted entity: "AWS service" → "Kinesis Data Firehose"
+   - Attach policy: Search for and attach "AmazonKinesisFirehoseDeliveryRolePolicy"
+   - Role name: `KinesisFirehoseDeliveryRole`
+   - Use this role when creating the Firehose stream
+
+3. **Check Your IAM Permissions:**
+   - Ensure your AWS user has permissions to create IAM roles
+   - Required permissions: `iam:CreateRole`, `iam:AttachRolePolicy`, `iam:PassRole`
 
 ### Problem 1: Uploading the CSV file to S3 does not trigger the Lambda function
 
