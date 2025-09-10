@@ -103,163 +103,213 @@ graph TB
 
 1. **Open the Amazon ECR console:**
    - Navigate to the AWS Management Console
-   - Search for "ECR" and select "Elastic Container Registry"
+   - Search for "ECR" in the services search bar
+   - Select "Elastic Container Registry" from the results
 
 2. **Create a new repository:**
-   - Click "Create repository"
-   - Choose "Private" repository
-   - Repository name: `flask-fargate-app`
-   - Leave other settings as default
+   - Click the orange "Create repository" button
+   - **Visibility settings:** Select "Private" (default)
+   - **Repository name:** `flask-fargate-app`
+   - **Tag immutability:** Leave as "Disabled" (default)
+   - **Image scan settings:** Leave "Scan on push" unchecked for this tutorial
+   - **Encryption settings:** Leave as "AES-256" (default)
    - Click "Create repository"
 
 3. **Note the repository URI:**
-   - After creation, you'll see a URI like: `123456789012.dkr.ecr.us-east-1.amazonaws.com/flask-fargate-app`
-   - Copy this URI - you'll need it later
+   - After creation, you'll be redirected to the repository details page
+   - Copy the URI displayed at the top (format: `123456789012.dkr.ecr.us-east-1.amazonaws.com/flask-fargate-app`)
+   - This URI will be needed for pushing your image
 
 ### Step 3: Push the Docker Image to ECR
 
 1. **Get login credentials for ECR:**
-   - In the ECR console, select your repository
-   - Click "View push commands"
+   - In the ECR console, select your `flask-fargate-app` repository
+   - Click the "View push commands" button in the top-right
+   - A modal will appear with platform-specific commands
    - Copy and run the first command (authentication):
 
-   **For Windows (Command Prompt):**
+   **For Windows (Command Prompt or PowerShell):**
    ```cmd
    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 123456789012.dkr.ecr.us-east-1.amazonaws.com
    ```
 
-   **For Linux/macOS:**
+   **For Linux/macOS/WSL:**
    ```bash
    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 123456789012.dkr.ecr.us-east-1.amazonaws.com
    ```
 
 2. **Tag your local image:**
+   Use the exact command from the "View push commands" modal:
    ```bash
    docker tag flask-fargate-app:latest 123456789012.dkr.ecr.us-east-1.amazonaws.com/flask-fargate-app:latest
    ```
    
-   Replace the URI with your actual ECR repository URI.
+   Replace the URI with your actual ECR repository URI from the modal.
 
 3. **Push the image to ECR:**
+   Use the exact command from the "View push commands" modal:
    ```bash
    docker push 123456789012.dkr.ecr.us-east-1.amazonaws.com/flask-fargate-app:latest
    ```
 
 4. **Verify the push:**
-   - Refresh the ECR console
-   - You should see your image listed with the "latest" tag
+   - Close the push commands modal
+   - Refresh the repository page
+   - You should see your image listed with the "latest" tag and upload timestamp
 
 ### Step 4: Set Up the ECS Cluster
 
 1. **Open the Amazon ECS console:**
    - Navigate to the AWS Management Console
-   - Search for "ECS" and select "Elastic Container Service"
+   - Search for "ECS" in the services search bar
+   - Select "Elastic Container Service" from the results
 
 2. **Create a new cluster:**
-   - Click "Create Cluster"
-   - Choose "Networking only" (Powered by AWS Fargate)
-   - Cluster name: `flask-fargate-cluster`
-   - Leave VPC settings as default (uses default VPC)
+   - Click "Create cluster" (orange button)
+   - **Cluster configuration:**
+     - **Cluster name:** `flask-fargate-cluster`
+     - **Namespace:** Leave default or create new (optional)
+   - **Infrastructure:**
+     - Select "AWS Fargate (serverless)" 
+     - Do not select "Amazon EC2 instances"
+   - **Monitoring:**
+     - Leave "Use Container Insights" unchecked for this tutorial
+   - **Tags:** (optional) Add any tags you prefer
    - Click "Create"
+
+3. **Wait for cluster creation:**
+   - The cluster will be created within 30-60 seconds
+   - You'll see a success message with a "View cluster" button
 
 ### Step 5: Create an ECS Task Definition
 
 1. **Navigate to Task Definitions:**
-   - In the ECS console, click "Task Definitions" in the left sidebar
-   - Click "Create new Task Definition"
+   - In the ECS console, click "Task definitions" in the left navigation menu
+   - Click "Create new task definition" (orange button)
 
-2. **Select launch type:**
-   - Choose "Fargate"
-   - Click "Next step"
+2. **Configure Task Definition basics:**
+   - **Task definition configuration:**
+     - **Task definition family:** `flask-fargate-task`
+     - **Launch type:** Select "AWS Fargate"
+   - **Operating system/Architecture:** Linux/X86_64
+   - **Task size:**
+     - **CPU:** 0.25 vCPU
+     - **Memory:** 0.5 GB
+   - **Task role:** Leave blank (not needed for this basic app)
+   - **Task execution role:** Select "ecsTaskExecutionRole" (will auto-create if missing)
 
-3. **Configure Task Definition:**
-   - **Task Definition Name:** `flask-fargate-task`
-   - **Task Role:** Leave empty (not needed for this basic app)
-   - **Task execution IAM role:** Select "ecsTaskExecutionRole" (if it doesn't exist, ECS will create it)
+3. **Configure Container:**
+   - In the "Container definitions" section, click "Add container"
+   - **Essential container details:**
+     - **Container name:** `flask-app`
+     - **Image URI:** Your full ECR URI (e.g., `123456789012.dkr.ecr.us-east-1.amazonaws.com/flask-fargate-app:latest`)
+   - **Resource allocation limits:**
+     - **Memory limit:** 512 (MiB) - Soft limit
+   - **Port mappings:**
+     - **Container port:** 8080
+     - **Protocol:** TCP
+     - **Port name:** `flask-app-8080-tcp` (auto-generated)
+     - **App protocol:** HTTP
+   - **Environment variables:** Leave empty for this tutorial
+   - **HealthCheck:** Leave as default (Docker HEALTHCHECK will be used)
 
-4. **Configure Task size:**
-   - **Task memory (GB):** 0.5 GB (512 MB)
-   - **Task CPU (vCPU):** 0.25 vCPU (256 CPU units)
+4. **Configure Logging (optional but recommended):**
+   - **Log configuration:**
+     - **Log driver:** awslogs
+     - **Log group:** `/ecs/flask-fargate-task` (will auto-create)
+     - **AWS Region:** us-east-1
+     - **Stream prefix:** ecs
 
-5. **Add Container:**
-   - Click "Add container"
-   - **Container name:** `flask-app`
-   - **Image:** Your ECR URI (e.g., `123456789012.dkr.ecr.us-east-1.amazonaws.com/flask-fargate-app:latest`)
-   - **Memory Limits:** Soft limit: 512 MB
-   - **Port mappings:** 
-     - Container port: 8080
-     - Protocol: tcp
-   - Leave other settings as default
-   - Click "Add"
-
-6. **Create the Task Definition:**
-   - Click "Create"
+5. **Create the Task Definition:**
+   - Click "Create" at the bottom of the page
+   - Wait for the success message
 
 ### Step 6: Create an ECS Service
 
 1. **Navigate to your cluster:**
-   - Go back to the ECS console
-   - Click on your cluster (`flask-fargate-cluster`)
+   - Return to the ECS console main page
+   - Click on your cluster name (`flask-fargate-cluster`)
 
 2. **Create a new service:**
-   - Click the "Services" tab
-   - Click "Create"
+   - In the cluster details page, go to the "Services" tab
+   - Click "Create" (orange button)
 
-3. **Configure Service:**
-   - **Launch type:** Fargate
-   - **Task Definition:** Select `flask-fargate-task:1` (latest revision)
+3. **Environment configuration:**
+   - **Compute options:** 
+     - Select "Launch type"
+     - **Launch type:** Fargate
+   - **Platform version:** LATEST
+
+4. **Deployment configuration:**
+   - **Application type:** Service
+   - **Task definition:**
+     - **Family:** `flask-fargate-task`
+     - **Revision:** LATEST (or select the specific revision)
    - **Service name:** `flask-fargate-service`
-   - **Number of tasks:** 2 (for high availability)
-   - **Minimum healthy percent:** 50
-   - **Maximum percent:** 200
+   - **Desired tasks:** 2
 
-4. **Configure Network:**
-   - **Cluster VPC:** Select the default VPC
-   - **Subnets:** Select at least 2 public subnets in different AZs
-   - **Security groups:** Create a new security group
+5. **Networking configuration:**
+   - **VPC:** Select your default VPC
+   - **Subnets:** Select at least 2 public subnets in different Availability Zones
+   - **Security group:** 
+     - Click "Create a new security group"
      - **Security group name:** `flask-fargate-sg`
      - **Description:** Security group for Flask Fargate service
-     - **Inbound rules:** 
-       - Type: Custom TCP
-       - Port: 8080
-       - Source: Anywhere (0.0.0.0/0) - for ALB access
-   - **Auto-assign public IP:** ENABLED
+     - **Inbound rules:**
+       - **Type:** Custom TCP
+       - **Port range:** 8080
+       - **Source:** Custom (0.0.0.0/0)
+   - **Public IP:** Turn ON "Auto-assign public IP"
 
-5. **Configure Load Balancing:**
+6. **Load balancing:**
    - **Load balancer type:** Application Load Balancer
-   - **Load balancer name:** `flask-fargate-alb`
-   - **Listener port:** 80
-   - **Target group name:** `flask-fargate-targets`
-   - **Target group protocol:** HTTP
-   - **Target group port:** 8080
-   - **Health check path:** `/health`
+   - **Application Load Balancer:** Create new load balancer
+     - **Load balancer name:** `flask-fargate-alb`
+     - **Listener:** Create new listener
+       - **Port:** 80
+       - **Protocol:** HTTP
+     - **Target group:** Create new target group
+       - **Target group name:** `flask-fargate-targets`
+       - **Protocol:** HTTP
+       - **Port:** 8080
+       - **Health check path:** `/health`
+       - **Health check grace period:** 30 seconds
 
-6. **Configure Auto Scaling (optional):**
-   - You can leave this disabled for this tutorial
-   - Click "Next step"
+7. **Service auto scaling (optional):**
+   - Leave "Use service auto scaling" unchecked for this tutorial
 
-7. **Review and Create:**
-   - Review all settings
-   - Click "Create Service"
+8. **Review and create:**
+   - Review all configurations
+   - Click "Create" at the bottom
+   - Wait for the deployment to complete (5-10 minutes)
 
 ### Step 7: Verify the Deployment
 
-1. **Wait for service deployment:**
-   - The service creation will take 5-10 minutes
-   - Monitor the "Events" tab for progress
-   - Wait until the service shows "2 running tasks"
+1. **Monitor service deployment:**
+   - Stay on the service details page
+   - Click on the "Tasks" tab to monitor task status
+   - Wait for both tasks to show "RUNNING" status (this may take 5-10 minutes)
+   - Monitor the "Events" tab for any deployment messages
 
-2. **Find the Load Balancer DNS name:**
-   - Go to the EC2 console
-   - Click "Load Balancers" in the left sidebar
+2. **Check Application Load Balancer:**
+   - Navigate to the EC2 console
+   - In the left navigation, click "Load Balancers"
    - Find your ALB (`flask-fargate-alb`)
-   - Copy the "DNS name" from the details panel
+   - In the "Description" tab, copy the "DNS name"
 
-3. **Test the application:**
+3. **Verify target health:**
+   - In the EC2 console, click "Target Groups" in the left navigation
+   - Select `flask-fargate-targets`
+   - Click the "Targets" tab
+   - Wait for both targets to show "healthy" status
+   - If targets show "unhealthy", check the troubleshooting section below
+
+4. **Test the application:**
    - Open a web browser
    - Navigate to the ALB DNS name (e.g., `flask-fargate-alb-123456789.us-east-1.elb.amazonaws.com`)
    - You should see the "Hello from Fargate!" message
-   - The ALB will distribute requests between your 2 Fargate tasks
+   - Refresh the page multiple times to see load balancing between tasks
+   - Test the health endpoint by adding `/health` to the URL
 
 ## 7. Troubleshooting Common Issues
 
@@ -425,61 +475,76 @@ graph TB
 
 **Important:** Follow this order to avoid dependency errors:
 
-### Step 1: Delete ECS Service
-1. Go to ECS console → Clusters → flask-fargate-cluster
+### Step 1: Update ECS Service to Zero Tasks
+1. Go to ECS console → Clusters → `flask-fargate-cluster`
 2. Click on the "Services" tab
 3. Select `flask-fargate-service`
-4. Click "Update"
-5. Set "Number of tasks" to 0
-6. Click "Update Service"
-7. Wait for all tasks to stop
-8. Click "Delete" and confirm
+4. Click "Update service" (not "Update")
+5. In the "Service configuration" section:
+   - Change "Desired tasks" from 2 to 0
+   - Leave all other settings unchanged
+6. Click "Update" at the bottom
+7. Wait for all tasks to stop (monitor in the "Tasks" tab)
 
-### Step 2: Delete ECS Cluster
-1. In ECS console, select your cluster
-2. Click "Delete Cluster"
-3. Type the cluster name to confirm
+### Step 2: Delete ECS Service
+1. After all tasks are stopped, return to the service
+2. Click "Delete service"
+3. Type the service name (`flask-fargate-service`) to confirm
 4. Click "Delete"
 
-### Step 3: Delete Application Load Balancer
+### Step 3: Delete ECS Cluster
+1. Navigate back to the ECS console main page
+2. Click "Clusters" in the left navigation
+3. Select your cluster (`flask-fargate-cluster`)
+4. Click "Delete cluster"
+5. Type the cluster name to confirm deletion
+6. Click "Delete"
+
+### Step 4: Delete Application Load Balancer
 1. Go to EC2 console → Load Balancers
 2. Select `flask-fargate-alb`
-3. Actions → Delete
-4. Type "delete" to confirm
+3. Click "Actions" → "Delete load balancer"
+4. Type "delete" in the confirmation box
+5. Click "Delete"
 
-### Step 4: Delete Target Group
-1. Go to EC2 console → Target Groups
+### Step 5: Delete Target Group
+1. In EC2 console, click "Target Groups" in left navigation
 2. Select `flask-fargate-targets`
-3. Actions → Delete
-4. Confirm deletion
+3. Click "Actions" → "Delete"
+4. Click "Yes, delete"
 
-### Step 5: Delete Security Groups
-1. Go to EC2 console → Security Groups
+### Step 6: Delete Security Groups
+1. In EC2 console, click "Security Groups" in left navigation
 2. Select `flask-fargate-sg`
-3. Actions → Delete security groups
-4. Confirm deletion
+3. Click "Actions" → "Delete security groups"
+4. Click "Delete" to confirm
+5. Note: You may need to wait a few minutes after deleting the ALB before the security group can be deleted
 
-### Step 6: Deregister Task Definition
-1. Go to ECS console → Task Definitions
+### Step 7: Delete Task Definition
+1. Go to ECS console → Task definitions
 2. Select `flask-fargate-task`
-3. Select revision 1
-4. Actions → Deregister
-5. Confirm
+3. Select the revision (usually revision 1)
+4. Click "Actions" → "Deregister"
+5. Click "Deregister" to confirm
 
-### Step 7: Delete ECR Repository
+### Step 8: Delete ECR Repository
 1. Go to ECR console
 2. Select `flask-fargate-app` repository
-3. Delete all images first:
-   - Select all images
-   - Delete
-4. Then delete the repository:
-   - Actions → Delete
+3. If there are images, first delete them:
+   - Select all images in the repository
+   - Click "Delete"
    - Type "delete" to confirm
+4. Then delete the repository:
+   - Click "Delete repository"
+   - Type the repository name to confirm
+   - Click "Delete"
 
-### Step 8: Delete CloudWatch Log Group
+### Step 9: Delete CloudWatch Log Group
 1. Go to CloudWatch console → Log groups
-2. Find `/ecs/flask-fargate-task`
-3. Select and delete the log group
+2. Search for `/ecs/flask-fargate-task`
+3. Select the log group
+4. Click "Actions" → "Delete log group(s)"
+5. Click "Delete" to confirm
 
 ## 11. Associated Project Files
 
